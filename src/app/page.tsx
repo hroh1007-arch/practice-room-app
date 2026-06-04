@@ -76,7 +76,12 @@ function minutesBetween(start: string, end: string) {
   return timeToMinutes(end) - timeToMinutes(start);
 }
 
-function overlaps(existingStart: string, existingEnd: string, newStart: string, newEnd: string) {
+function overlaps(
+  existingStart: string,
+  existingEnd: string,
+  newStart: string,
+  newEnd: string
+) {
   return (
     timeToMinutes(existingStart) < timeToMinutes(newEnd) &&
     timeToMinutes(existingEnd) > timeToMinutes(newStart)
@@ -113,15 +118,22 @@ export default function Home() {
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [adminBookings, setAdminBookings] = useState<Booking[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
+
   const [newRoleEmail, setNewRoleEmail] = useState("");
-  const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
+  const [newRoleType, setNewRoleType] =
+    useState<"admin" | "instructor">("instructor");
+
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [view, setView] = useState<"booking" | "myBookings" | "admin" | "roles">("booking");
+  const [view, setView] =
+    useState<"booking" | "myBookings" | "admin" | "roles">("booking");
+
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
 
   const currentRole = user?.email
-    ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
+    ? roles.find(
+        (r) => r.email.toLowerCase() === user.email?.toLowerCase()
+      )?.role
     : undefined;
 
   const isBackupAdmin = user?.email
@@ -183,7 +195,9 @@ export default function Home() {
   async function checkUser(currentUser: User | null) {
     if (
       currentUser &&
-      !allowedDomains.some((domain) => currentUser.email?.endsWith(domain))
+      !allowedDomains.some((domain) =>
+        currentUser.email?.endsWith(domain)
+      )
     ) {
       await supabase.auth.signOut();
       alert("Only TC or Columbia Google accounts are allowed.");
@@ -531,7 +545,10 @@ export default function Home() {
 
     const normalizedEmail = newRoleEmail.trim().toLowerCase();
 
-    if (!normalizedEmail.endsWith("@tc.columbia.edu") && !normalizedEmail.endsWith("@columbia.edu")) {
+    if (
+      !normalizedEmail.endsWith("@tc.columbia.edu") &&
+      !normalizedEmail.endsWith("@columbia.edu")
+    ) {
       alert("Only TC or Columbia emails can be added.");
       return;
     }
@@ -561,18 +578,26 @@ export default function Home() {
 
     const roleToRemove = roles.find((r) => r.id === roleId);
 
-    if (roleToRemove && backupAdminEmails.includes(roleToRemove.email.toLowerCase())) {
-      alert("Original backup admins cannot be removed from this page.");
+    if (!roleToRemove) {
+      alert("Role not found.");
       return;
     }
 
-    const confirmed = window.confirm("Remove this role?");
+    if (backupAdminEmails.includes(roleToRemove.email.toLowerCase())) {
+      alert("Original backup admins cannot be removed.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Remove ${roleToRemove.email} as ${roleToRemove.role}?`
+    );
+
     if (!confirmed) return;
 
     const { error } = await supabase
       .from("user_roles")
       .delete()
-      .eq("id", roleId);
+      .eq("email", roleToRemove.email);
 
     if (error) {
       alert(error.message);
@@ -626,27 +651,42 @@ export default function Home() {
                 {!isAdmin && isInstructor && <span> · instructor</span>}
               </span>
 
-              <button onClick={() => setView("booking")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
+              <button
+                onClick={() => setView("booking")}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
                 Book Room
               </button>
 
-              <button onClick={() => setView("myBookings")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
+              <button
+                onClick={() => setView("myBookings")}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
                 My Bookings
               </button>
 
               {isAdmin && (
                 <>
-                  <button onClick={() => setView("admin")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
+                  <button
+                    onClick={() => setView("admin")}
+                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                  >
                     Admin Bookings
                   </button>
 
-                  <button onClick={() => setView("roles")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
+                  <button
+                    onClick={() => setView("roles")}
+                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                  >
                     Manage Roles
                   </button>
                 </>
               )}
 
-              <button onClick={logout} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
+              <button
+                onClick={logout}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
                 Log out
               </button>
 
@@ -663,7 +703,10 @@ export default function Home() {
               )}
             </>
           ) : (
-            <button onClick={loginWithGoogle} className="bg-black text-white px-5 py-2 rounded-lg hover:bg-gray-800">
+            <button
+              onClick={loginWithGoogle}
+              className="bg-black text-white px-5 py-2 rounded-lg hover:bg-gray-800"
+            >
               Continue with TC/CU Google
             </button>
           )}
@@ -744,7 +787,10 @@ export default function Home() {
 
             <div className="space-y-4">
               {myBookings.map((booking) => (
-                <div key={booking.id} className="border rounded-xl p-4 flex items-center justify-between">
+                <div
+                  key={booking.id}
+                  className="border rounded-xl p-4 flex items-center justify-between"
+                >
                   <div>
                     <p className="font-semibold text-lg">
                       {roomName(booking.room_id)}
@@ -756,7 +802,10 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <button onClick={() => cancelBooking(booking.id)} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                  <button
+                    onClick={() => cancelBooking(booking.id)}
+                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                  >
                     Cancel
                   </button>
                 </div>
@@ -775,7 +824,10 @@ export default function Home() {
 
             <div className="space-y-4">
               {adminBookings.map((booking) => (
-                <div key={booking.id} className="border rounded-xl p-4 flex items-center justify-between">
+                <div
+                  key={booking.id}
+                  className="border rounded-xl p-4 flex items-center justify-between"
+                >
                   <div>
                     <p className="font-semibold text-lg">
                       {roomName(booking.room_id)}
@@ -791,7 +843,10 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <button onClick={() => adminCancelBooking(booking.id)} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                  <button
+                    onClick={() => adminCancelBooking(booking.id)}
+                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                  >
                     Cancel
                   </button>
                 </div>
@@ -802,7 +857,9 @@ export default function Home() {
 
         {view === "roles" && isAdmin && (
           <div className="bg-white rounded-2xl shadow-lg border p-6">
-            <h2 className="text-3xl font-bold mb-6">Manage Instructors & Admins</h2>
+            <h2 className="text-3xl font-bold mb-6">
+              Manage Instructors & Admins
+            </h2>
 
             <div className="flex gap-3 mb-6 flex-wrap">
               <input
@@ -824,7 +881,10 @@ export default function Home() {
                 <option value="admin">Admin</option>
               </select>
 
-              <button onClick={addRole} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+              <button
+                onClick={addRole}
+                className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+              >
                 Add / Update Role
               </button>
             </div>
@@ -835,13 +895,19 @@ export default function Home() {
 
             <div className="space-y-4">
               {roles.map((role) => (
-                <div key={role.id} className="border rounded-xl p-4 flex items-center justify-between">
+                <div
+                  key={role.id}
+                  className="border rounded-xl p-4 flex items-center justify-between"
+                >
                   <div>
                     <p className="font-semibold">{role.email}</p>
                     <p className="text-gray-600 capitalize">{role.role}</p>
                   </div>
 
-                  <button onClick={() => removeRole(role.id)} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                  <button
+                    onClick={() => removeRole(role.id)}
+                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                  >
                     Remove
                   </button>
                 </div>
