@@ -18,6 +18,12 @@ type Booking = {
   user_email: string;
 };
 
+type UserRole = {
+  id: string;
+  email: string;
+  role: "admin" | "instructor";
+};
+
 type Selection = {
   room: Room;
   start: string;
@@ -39,13 +45,6 @@ const times = [
 ];
 
 const allowedDomains = ["@tc.columbia.edu", "@columbia.edu"];
-
-const adminEmails = [
-  "hh3144@tc.columbia.edu",
-  "jcg21@tc.columbia.edu",
-  "instruments@tc.columbia.edu",
-  "ma3412@tc.columbia.edu",
-];
 
 function cleanTime(time: string) {
   return time.slice(0, 5);
@@ -106,12 +105,31 @@ export default function Home() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [adminBookings, setAdminBookings] = useState<Booking[]>([]);
+  const [roles, setRoles] = useState<UserRole[]>([]);
+  const [newRoleEmail, setNewRoleEmail] = useState("");
+  const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [view, setView] = useState<"booking" | "myBookings" | "admin">("booking");
+  const [view, setView] = useState<"booking" | "myBookings" | "admin" | "roles">("booking");
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
 
-  const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
+  const currentRole = user?.email
+    ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
+    : undefined;
+
+  const isAdmin = currentRole === "admin";
+  const isInstructor = currentRole === "instructor";
+  const hasUnlimitedBooking = isAdmin || isInstructor;
+
+  async function loadRoles() {
+    const { data } = await supabase
+      .from("user_roles")
+      .select("*")
+      .order("role", { ascending: true })
+      .order("email", { ascending: true });
+
+    setRoles((data || []) as UserRole[]);
+  }
 
   async function loadData() {
     const { data: roomsData } = await supabase
@@ -164,6 +182,8 @@ export default function Home() {
   }
 
   useEffect(() => {
+    loadRoles();
+
     supabase.auth.getUser().then(({ data }) => {
       checkUser(data.user);
     });
@@ -237,7 +257,7 @@ export default function Home() {
     if (timeToMinutes(cellTime) < timeToMinutes(start)) return false;
     if (timeToMinutes(cellTime) >= timeToMinutes(previewEnd)) return false;
     if (duration < 30) return false;
-    if (!isAdmin && duration > 120) return false;
+    if (!hasUnlimitedBooking && duration > 120) return false;
 
     return true;
   }
@@ -325,7 +345,7 @@ export default function Home() {
       return;
     }
 
-    if (!isAdmin && duration > 120) {
+    if (!hasUnlimitedBooking && duration > 120) {
       alert("One booking can only be up to 2 hours.");
       setSelection(null);
       setHoverTime(null);
@@ -340,7 +360,7 @@ export default function Home() {
       return;
     }
 
-    if (!isAdmin) {
+    if (!hasUnlimitedBooking) {
       const dailyOk = await checkDailyLimit(duration);
       if (!dailyOk) {
         setSelection(null);
@@ -491,6 +511,51 @@ export default function Home() {
     }
   }
 
+  async function addRole() {
+    if (!isAdmin) return;
+
+    const normalizedEmail = newRoleEmail.trim().toLowerCase();
+
+    if (!normalizedEmail.endsWith("@tc.columbia.edu") && !normalizedEmail.endsWith("@columbia.edu")) {
+      alert("Only TC or Columbia emails can be added.");
+      return;
+    }
+
+    const { error } = await supabase.from("user_roles").insert({
+      email: normalizedEmail,
+      role: newRoleType,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewRoleEmail("");
+    await loadRoles();
+    alert("User role added.");
+  }
+
+  async function removeRole(roleId: string) {
+    if (!isAdmin) return;
+
+    const confirmed = window.confirm("Remove this role?");
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("user_roles")
+      .delete()
+      .eq("id", roleId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadRoles();
+    alert("Role removed.");
+  }
+
   function handleDateChange(newDate: string) {
     if (isWeekend(newDate)) {
       alert("Weekend bookings are not allowed.");
@@ -530,6 +595,7 @@ export default function Home() {
             <>
               <span className="text-gray-700">
                 Logged in as <strong>{user.email}</strong>
+                {currentRole && <span> · {currentRole}</span>}
               </span>
 
               <button
@@ -547,12 +613,21 @@ export default function Home() {
               </button>
 
               {isAdmin && (
-                <button
-                  onClick={() => setView("admin")}
-                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                >
-                  Admin
-                </button>
+                <>
+                  <button
+                    onClick={() => setView("admin")}
+                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                  >
+                    Admin Bookings
+                  </button>
+
+                  <button
+                    onClick={() => setView("roles")}
+                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                  >
+                    Manage Roles
+                  </button>
+                </>
               )}
 
               <button
@@ -720,6 +795,65 @@ export default function Home() {
                     className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
                   >
                     Cancel
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {view === "roles" && isAdmin && (
+          <div className="bg-white rounded-2xl shadow-lg border p-6">
+            <h2 className="text-3xl font-bold mb-6">Manage Instructors & Admins</h2>
+
+            <div className="flex gap-3 mb-6 flex-wrap">
+              <input
+                type="email"
+                placeholder="UNI@tc.columbia.edu"
+                value={newRoleEmail}
+                onChange={(e) => setNewRoleEmail(e.target.value)}
+                className="border rounded-lg px-4 py-2"
+              />
+
+              <select
+                value={newRoleType}
+                onChange={(e) =>
+                  setNewRoleType(e.target.value as "admin" | "instructor")
+                }
+                className="border rounded-lg px-4 py-2"
+              >
+                <option value="instructor">Instructor</option>
+                <option value="admin">Admin</option>
+              </select>
+
+              <button
+                onClick={addRole}
+                className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+              >
+                Add Role
+              </button>
+            </div>
+
+            {roles.length === 0 && (
+              <p className="text-gray-600">No roles added yet.</p>
+            )}
+
+            <div className="space-y-4">
+              {roles.map((role) => (
+                <div
+                  key={role.id}
+                  className="border rounded-xl p-4 flex items-center justify-between"
+                >
+                  <div>
+                    <p className="font-semibold">{role.email}</p>
+                    <p className="text-gray-600 capitalize">{role.role}</p>
+                  </div>
+
+                  <button
+                    onClick={() => removeRole(role.id)}
+                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                  >
+                    Remove
                   </button>
                 </div>
               ))}
