@@ -191,6 +191,7 @@ export default function Home() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         checkUser(session?.user || null);
+        loadRoles();
       }
     );
 
@@ -200,8 +201,9 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    loadRoles();
     loadData();
-  }, [date, user, isAdmin]);
+  }, [date, user, roles.length]);
 
   async function loginWithGoogle() {
     await supabase.auth.signInWithOAuth({
@@ -521,9 +523,11 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase.from("user_roles").insert({
+    const { error } = await supabase.from("user_roles").upsert({
       email: normalizedEmail,
       role: newRoleType,
+    }, {
+      onConflict: "email",
     });
 
     if (error) {
@@ -598,42 +602,27 @@ export default function Home() {
                 {currentRole && <span> · {currentRole}</span>}
               </span>
 
-              <button
-                onClick={() => setView("booking")}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
+              <button onClick={() => setView("booking")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
                 Book Room
               </button>
 
-              <button
-                onClick={() => setView("myBookings")}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
+              <button onClick={() => setView("myBookings")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
                 My Bookings
               </button>
 
               {isAdmin && (
                 <>
-                  <button
-                    onClick={() => setView("admin")}
-                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                  >
+                  <button onClick={() => setView("admin")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
                     Admin Bookings
                   </button>
 
-                  <button
-                    onClick={() => setView("roles")}
-                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                  >
+                  <button onClick={() => setView("roles")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
                     Manage Roles
                   </button>
                 </>
               )}
 
-              <button
-                onClick={logout}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
+              <button onClick={logout} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
                 Log out
               </button>
 
@@ -650,10 +639,7 @@ export default function Home() {
               )}
             </>
           ) : (
-            <button
-              onClick={loginWithGoogle}
-              className="bg-black text-white px-5 py-2 rounded-lg hover:bg-gray-800"
-            >
+            <button onClick={loginWithGoogle} className="bg-black text-white px-5 py-2 rounded-lg hover:bg-gray-800">
               Continue with TC/CU Google
             </button>
           )}
@@ -734,10 +720,7 @@ export default function Home() {
 
             <div className="space-y-4">
               {myBookings.map((booking) => (
-                <div
-                  key={booking.id}
-                  className="border rounded-xl p-4 flex items-center justify-between"
-                >
+                <div key={booking.id} className="border rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-lg">
                       {roomName(booking.room_id)}
@@ -749,10 +732,7 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => cancelBooking(booking.id)}
-                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                  >
+                  <button onClick={() => cancelBooking(booking.id)} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
                     Cancel
                   </button>
                 </div>
@@ -771,10 +751,7 @@ export default function Home() {
 
             <div className="space-y-4">
               {adminBookings.map((booking) => (
-                <div
-                  key={booking.id}
-                  className="border rounded-xl p-4 flex items-center justify-between"
-                >
+                <div key={booking.id} className="border rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-lg">
                       {roomName(booking.room_id)}
@@ -790,10 +767,7 @@ export default function Home() {
                     </p>
                   </div>
 
-                  <button
-                    onClick={() => adminCancelBooking(booking.id)}
-                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                  >
+                  <button onClick={() => adminCancelBooking(booking.id)} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
                     Cancel
                   </button>
                 </div>
@@ -826,11 +800,8 @@ export default function Home() {
                 <option value="admin">Admin</option>
               </select>
 
-              <button
-                onClick={addRole}
-                className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-              >
-                Add Role
+              <button onClick={addRole} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
+                Add / Update Role
               </button>
             </div>
 
@@ -840,19 +811,13 @@ export default function Home() {
 
             <div className="space-y-4">
               {roles.map((role) => (
-                <div
-                  key={role.id}
-                  className="border rounded-xl p-4 flex items-center justify-between"
-                >
+                <div key={role.id} className="border rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <p className="font-semibold">{role.email}</p>
                     <p className="text-gray-600 capitalize">{role.role}</p>
                   </div>
 
-                  <button
-                    onClick={() => removeRole(role.id)}
-                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                  >
+                  <button onClick={() => removeRole(role.id)} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">
                     Remove
                   </button>
                 </div>
