@@ -235,7 +235,7 @@ export default function Home() {
     return (
       timeToMinutes(cellTime) >= timeToMinutes(start) &&
       duration >= 30 &&
-      duration <= 120
+      (isAdmin || duration <= 120)
     );
   }
 
@@ -319,8 +319,14 @@ export default function Home() {
     const end = cellEnd(time);
     const duration = minutesBetween(start, end);
 
-    if (duration < 30 || duration > 120) {
-      alert("One booking can only be 30 minutes to 2 hours.");
+    if (duration < 30) {
+      alert("Minimum booking time is 30 minutes.");
+      setSelection(null);
+      return;
+    }
+
+    if (!isAdmin && duration > 120) {
+      alert("One booking can only be up to 2 hours.");
       setSelection(null);
       return;
     }
@@ -502,8 +508,13 @@ export default function Home() {
 
     const duration = minutesBetween(newStart, newEnd);
 
-    if (duration < 30 || duration > 120) {
-      alert("Booking must be between 30 minutes and 2 hours.");
+    if (duration < 30) {
+      alert("Minimum booking time is 30 minutes.");
+      return;
+    }
+
+    if (!isAdmin && duration > 120) {
+      alert("Booking must be 2 hours or less.");
       return;
     }
 
