@@ -16,6 +16,8 @@ type Booking = {
   start_time: string;
   end_time: string;
   user_email: string;
+  checked_in?: boolean;
+  checked_in_at?: string | null;
 };
 
 type UserRole = {
@@ -76,12 +78,7 @@ function minutesBetween(start: string, end: string) {
   return timeToMinutes(end) - timeToMinutes(start);
 }
 
-function overlaps(
-  existingStart: string,
-  existingEnd: string,
-  newStart: string,
-  newEnd: string
-) {
+function overlaps(existingStart: string, existingEnd: string, newStart: string, newEnd: string) {
   return (
     timeToMinutes(existingStart) < timeToMinutes(newEnd) &&
     timeToMinutes(existingEnd) > timeToMinutes(newStart)
@@ -120,20 +117,16 @@ export default function Home() {
   const [roles, setRoles] = useState<UserRole[]>([]);
 
   const [newRoleEmail, setNewRoleEmail] = useState("");
-  const [newRoleType, setNewRoleType] =
-    useState<"admin" | "instructor">("instructor");
+  const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [view, setView] =
-    useState<"booking" | "myBookings" | "admin" | "roles">("booking");
+  const [view, setView] = useState<"booking" | "myBookings" | "admin" | "roles">("booking");
 
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
 
   const currentRole = user?.email
-    ? roles.find(
-        (role) => role.email.toLowerCase() === user.email?.toLowerCase()
-      )?.role
+    ? roles.find((role) => role.email.toLowerCase() === user.email?.toLowerCase())?.role
     : undefined;
 
   const isBackupAdmin = user?.email
@@ -151,12 +144,7 @@ export default function Home() {
       .order("role", { ascending: true })
       .order("email", { ascending: true });
 
-    if (error) {
-      console.error(error.message);
-      return;
-    }
-
-    setRoles((data || []) as UserRole[]);
+    if (!error) setRoles((data || []) as UserRole[]);
   }
 
   async function loadData() {
@@ -292,6 +280,24 @@ export default function Home() {
     return true;
   }
 
+  async function checkSuspension() {
+    if (!user?.email || hasUnlimitedBooking) return false;
+
+    const { data } = await supabase
+      .from("user_suspensions")
+      .select("*")
+      .eq("email", user.email)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (data) {
+      alert("Your booking access is temporarily suspended due to repeated no-shows.");
+      return true;
+    }
+
+    return false;
+  }
+
   async function checkDailyLimit(durationMinutes: number) {
     if (!user?.email) return false;
 
@@ -344,6 +350,9 @@ export default function Home() {
       alert("Please log in with your TC or Columbia Google account before booking.");
       return;
     }
+
+    const suspended = await checkSuspension();
+    if (suspended) return;
 
     if (isWeekend(date)) {
       alert("Weekend bookings are not allowed.");
@@ -423,6 +432,8 @@ export default function Home() {
       start_time: start,
       end_time: end,
       user_email: user.email || "",
+      checked_in: hasUnlimitedBooking,
+      checked_in_at: hasUnlimitedBooking ? new Date().toISOString() : null,
     };
 
     setBookings((prev) => [...prev, optimisticBooking]);
@@ -434,6 +445,8 @@ export default function Home() {
       booking_date: date,
       start_time: start,
       end_time: end,
+      checked_in: hasUnlimitedBooking,
+      checked_in_at: hasUnlimitedBooking ? new Date().toISOString() : null,
     });
 
     if (error) {
@@ -467,7 +480,11 @@ export default function Home() {
     setHoverTime(null);
     await loadData();
 
-    alert("Booking confirmed!");
+    alert(
+      hasUnlimitedBooking
+        ? "Booking confirmed. Instructor/admin bookings do not require check-in."
+        : "Booking confirmed. Please scan the room QR code to check in when you arrive."
+    );
   }
 
   async function cancelBooking(bookingId: string) {
@@ -796,6 +813,12 @@ export default function Home() {
                       {booking.booking_date} · {cleanTime(booking.start_time)}–
                       {cleanTime(booking.end_time)}
                     </p>
+
+                    {!hasUnlimitedBooking && (
+                      <p className="text-gray-500 text-sm">
+                        Check-in required by scanning the room QR code.
+                      </p>
+                    )}
                   </div>
 
                   <button
@@ -836,6 +859,10 @@ export default function Home() {
 
                     <p className="text-gray-500 text-sm">
                       {booking.user_email}
+                    </p>
+
+                    <p className="text-gray-500 text-sm">
+                      Checked in: {booking.checked_in ? "Yes" : "No"}
                     </p>
                   </div>
 
