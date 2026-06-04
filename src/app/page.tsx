@@ -46,6 +46,13 @@ const times = [
 
 const allowedDomains = ["@tc.columbia.edu", "@columbia.edu"];
 
+const backupAdminEmails = [
+  "hh3144@tc.columbia.edu",
+  "jcg21@tc.columbia.edu",
+  "instruments@tc.columbia.edu",
+  "ma3412@tc.columbia.edu",
+];
+
 function cleanTime(time: string) {
   return time.slice(0, 5);
 }
@@ -117,18 +124,24 @@ export default function Home() {
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
     : undefined;
 
-  const isAdmin = currentRole === "admin";
+  const isBackupAdmin = user?.email
+    ? backupAdminEmails.includes(user.email.toLowerCase())
+    : false;
+
+  const isAdmin = currentRole === "admin" || isBackupAdmin;
   const isInstructor = currentRole === "instructor";
   const hasUnlimitedBooking = isAdmin || isInstructor;
 
   async function loadRoles() {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("user_roles")
       .select("*")
       .order("role", { ascending: true })
       .order("email", { ascending: true });
 
-    setRoles((data || []) as UserRole[]);
+    if (!error) {
+      setRoles((data || []) as UserRole[]);
+    }
   }
 
   async function loadData() {
@@ -203,7 +216,7 @@ export default function Home() {
   useEffect(() => {
     loadRoles();
     loadData();
-  }, [date, user, roles.length]);
+  }, [date, user, roles.length, isAdmin]);
 
   async function loginWithGoogle() {
     await supabase.auth.signInWithOAuth({
@@ -523,12 +536,15 @@ export default function Home() {
       return;
     }
 
-    const { error } = await supabase.from("user_roles").upsert({
-      email: normalizedEmail,
-      role: newRoleType,
-    }, {
-      onConflict: "email",
-    });
+    const { error } = await supabase.from("user_roles").upsert(
+      {
+        email: normalizedEmail,
+        role: newRoleType,
+      },
+      {
+        onConflict: "email",
+      }
+    );
 
     if (error) {
       alert(error.message);
@@ -537,11 +553,18 @@ export default function Home() {
 
     setNewRoleEmail("");
     await loadRoles();
-    alert("User role added.");
+    alert("User role added or updated.");
   }
 
   async function removeRole(roleId: string) {
     if (!isAdmin) return;
+
+    const roleToRemove = roles.find((r) => r.id === roleId);
+
+    if (roleToRemove && backupAdminEmails.includes(roleToRemove.email.toLowerCase())) {
+      alert("Original backup admins cannot be removed from this page.");
+      return;
+    }
 
     const confirmed = window.confirm("Remove this role?");
     if (!confirmed) return;
@@ -599,7 +622,8 @@ export default function Home() {
             <>
               <span className="text-gray-700">
                 Logged in as <strong>{user.email}</strong>
-                {currentRole && <span> · {currentRole}</span>}
+                {isAdmin && <span> · admin</span>}
+                {!isAdmin && isInstructor && <span> · instructor</span>}
               </span>
 
               <button onClick={() => setView("booking")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
