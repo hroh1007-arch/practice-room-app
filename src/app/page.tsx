@@ -82,6 +82,7 @@ function getEndOptions(start: string) {
 
   for (let minutes = 30; minutes <= 120; minutes += 30) {
     const end = startMinutes + minutes;
+
     if (end <= 21 * 60) {
       options.push(minutesToTime(end));
     }
@@ -150,7 +151,9 @@ export default function Home() {
   async function checkUser(currentUser: User | null) {
     if (
       currentUser &&
-      !allowedDomains.some((domain) => currentUser.email?.endsWith(domain))
+      !allowedDomains.some((domain) =>
+        currentUser.email?.endsWith(domain)
+      )
     ) {
       await supabase.auth.signOut();
       alert("Only TC or Columbia Google accounts are allowed.");
@@ -308,17 +311,35 @@ export default function Home() {
       return;
     }
 
+    await fetch("/api/send-booking-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "confirm",
+        email: user.email,
+        room: selectedRoom.room_number,
+        date,
+        startTime: selectedStart,
+        endTime: selectedEnd,
+      }),
+    });
+
     setSelectedRoom(null);
     setSelectedStart("");
     setSelectedEnd("");
 
     await loadData();
+
     alert("Booking confirmed!");
   }
 
   async function cancelBooking(bookingId: string) {
     const confirmed = window.confirm("Cancel this booking?");
     if (!confirmed) return;
+
+    const cancelledBooking = myBookings.find((b) => b.id === bookingId);
 
     const { error } = await supabase
       .from("bookings")
@@ -329,7 +350,25 @@ export default function Home() {
     if (error) {
       alert(error.message);
     } else {
+      if (cancelledBooking) {
+        await fetch("/api/send-booking-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type: "cancel",
+            email: user?.email,
+            room: roomName(cancelledBooking.room_id),
+            date: cancelledBooking.booking_date,
+            startTime: cleanTime(cancelledBooking.start_time),
+            endTime: cleanTime(cancelledBooking.end_time),
+          }),
+        });
+      }
+
       alert("Booking cancelled.");
+
       await loadData();
     }
   }
@@ -340,6 +379,8 @@ export default function Home() {
     const confirmed = window.confirm("Admin cancel this booking?");
     if (!confirmed) return;
 
+    const cancelledBooking = bookings.find((b) => b.id === bookingId);
+
     const { error } = await supabase
       .from("bookings")
       .delete()
@@ -348,7 +389,25 @@ export default function Home() {
     if (error) {
       alert(error.message);
     } else {
+      if (cancelledBooking) {
+        await fetch("/api/send-booking-email", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            type: "cancel",
+            email: cancelledBooking.user_email,
+            room: roomName(cancelledBooking.room_id),
+            date: cancelledBooking.booking_date,
+            startTime: cleanTime(cancelledBooking.start_time),
+            endTime: cleanTime(cancelledBooking.end_time),
+          }),
+        });
+      }
+
       alert("Booking cancelled by admin.");
+
       await loadData();
     }
   }
@@ -608,7 +667,8 @@ export default function Home() {
                     </p>
 
                     <p className="text-gray-600">
-                      {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
+                      {booking.booking_date} · {cleanTime(booking.start_time)}–
+                      {cleanTime(booking.end_time)}
                     </p>
                   </div>
 
@@ -666,7 +726,8 @@ export default function Home() {
                     </p>
 
                     <p className="text-gray-600">
-                      {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
+                      {booking.booking_date} · {cleanTime(booking.start_time)}–
+                      {cleanTime(booking.end_time)}
                     </p>
 
                     <p className="text-gray-500 text-sm">
