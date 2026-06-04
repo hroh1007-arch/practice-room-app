@@ -273,8 +273,10 @@ export default function Home() {
       return;
     }
 
-    const weeklyOk = await checkWeeklyLimit(duration);
-    if (!weeklyOk) return;
+    if (!isAdmin) {
+      const weeklyOk = await checkWeeklyLimit(duration);
+      if (!weeklyOk) return;
+    }
 
     const optimisticBooking: Booking = {
       id: crypto.randomUUID(),
@@ -543,7 +545,7 @@ export default function Home() {
                   <th className="p-4 text-left border-b">Room</th>
 
                   {times.map((time) => (
-                    <th key={time} className="p-4 text-sm font-medium border-b">
+                    <th key={time} className="p-3 text-sm font-medium border-b">
                       {time}
                     </th>
                   ))}
@@ -561,7 +563,7 @@ export default function Home() {
                       const booked = isCellBooked(room.id, time);
 
                       return (
-                        <td key={time} className="border-b p-2">
+                        <td key={time} className="border-b p-0">
                           <button
                             disabled={booked}
                             onClick={() => {
@@ -570,8 +572,8 @@ export default function Home() {
                             }}
                             className={
                               booked
-                                ? "bg-gray-300 text-gray-600 px-3 py-2 rounded cursor-not-allowed border w-full h-12"
-                                : "bg-white hover:bg-gray-100 px-3 py-2 rounded border w-full h-12"
+                                ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 rounded-none"
+                                : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 rounded-none"
                             }
                           >
                             {booked ? "Booked" : ""}
