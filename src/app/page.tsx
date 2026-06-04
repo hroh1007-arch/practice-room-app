@@ -33,22 +33,6 @@ const times = [
   "20:00", "20:30",
 ];
 
-const endTimes = [
-  "09:30",
-  "10:00", "10:30",
-  "11:00", "11:30",
-  "12:00", "12:30",
-  "13:00", "13:30",
-  "14:00", "14:30",
-  "15:00", "15:30",
-  "16:00", "16:30",
-  "17:00", "17:30",
-  "18:00", "18:30",
-  "19:00", "19:30",
-  "20:00", "20:30",
-  "21:00",
-];
-
 const allowedDomains = [
   "@tc.columbia.edu",
   "@columbia.edu",
@@ -70,6 +54,12 @@ function timeToMinutes(time: string) {
   return hour * 60 + minute;
 }
 
+function minutesToTime(total: number) {
+  const hour = Math.floor(total / 60);
+  const minute = total % 60;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
 function minutesBetween(start: string, end: string) {
   return timeToMinutes(end) - timeToMinutes(start);
 }
@@ -80,8 +70,24 @@ function overlaps(
   newStart: string,
   newEnd: string
 ) {
-  return timeToMinutes(existingStart) < timeToMinutes(newEnd) &&
-    timeToMinutes(existingEnd) > timeToMinutes(newStart);
+  return (
+    timeToMinutes(existingStart) < timeToMinutes(newEnd) &&
+    timeToMinutes(existingEnd) > timeToMinutes(newStart)
+  );
+}
+
+function getEndOptions(start: string) {
+  const startMinutes = timeToMinutes(start);
+  const options = [];
+
+  for (let minutes = 30; minutes <= 120; minutes += 30) {
+    const end = startMinutes + minutes;
+    if (end <= 21 * 60) {
+      options.push(minutesToTime(end));
+    }
+  }
+
+  return options;
 }
 
 function getWeekRange(selectedDate: string) {
@@ -107,9 +113,11 @@ export default function Home() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [startTime, setStartTime] = useState("09:00");
-  const [endTime, setEndTime] = useState("09:30");
   const [view, setView] = useState<"booking" | "myBookings" | "admin">("booking");
+
+  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
+  const [selectedStart, setSelectedStart] = useState("");
+  const [selectedEnd, setSelectedEnd] = useState("");
 
   const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
 
@@ -194,7 +202,7 @@ export default function Home() {
   }
 
   function isCellBooked(roomId: string, cellTime: string) {
-    const cellEnd = endTimes[times.indexOf(cellTime)];
+    const cellEnd = minutesToTime(timeToMinutes(cellTime) + 30);
 
     return bookings.some(
       (booking) =>
@@ -204,29 +212,13 @@ export default function Home() {
     );
   }
 
-  function selectedDurationMinutes() {
-    return minutesBetween(startTime, endTime);
-  }
-
-  function validateSelectedTime() {
-    const duration = selectedDurationMinutes();
-
-    if (timeToMinutes(endTime) <= timeToMinutes(startTime)) {
-      alert("End time must be after start time.");
-      return false;
-    }
-
-    if (duration < 30) {
-      alert("Minimum booking time is 30 minutes.");
-      return false;
-    }
-
-    if (duration > 120) {
-      alert("Maximum booking time is 2 hours.");
-      return false;
-    }
-
-    return true;
+  function hasConflict(roomId: string, start: string, end: string) {
+    return bookings.some(
+      (booking) =>
+        booking.room_id === roomId &&
+        booking.booking_date === date &&
+        overlaps(booking.start_time, booking.end_time, start, end)
+    );
   }
 
   async function checkWeeklyLimit(durationMinutes: number) {
@@ -254,24 +246,28 @@ export default function Home() {
     return true;
   }
 
-  async function bookRoom(roomId: string) {
+  function openBookingPanel(room: Room, start: string) {
     if (!user) {
       alert("Please log in with your TC or Columbia Google account before booking.");
       return;
     }
 
-    if (!validateSelectedTime()) return;
+    setSelectedRoom(room);
+    setSelectedStart(start);
+    setSelectedEnd(getEndOptions(start)[0]);
+  }
 
-    const duration = selectedDurationMinutes();
+  async function confirmBooking() {
+    if (!user || !selectedRoom || !selectedStart || !selectedEnd) return;
 
-    const localConflict = bookings.find(
-      (booking) =>
-        booking.room_id === roomId &&
-        booking.booking_date === date &&
-        overlaps(booking.start_time, booking.end_time, startTime, endTime)
-    );
+    const duration = minutesBetween(selectedStart, selectedEnd);
 
-    if (localConflict) {
+    if (duration < 30 || duration > 120) {
+      alert("Booking must be between 30 minutes and 2 hours.");
+      return;
+    }
+
+    if (hasConflict(selectedRoom.id, selectedStart, selectedEnd)) {
       alert("This room is already booked during that time.");
       await loadData();
       return;
@@ -282,22 +278,22 @@ export default function Home() {
 
     const optimisticBooking: Booking = {
       id: crypto.randomUUID(),
-      room_id: roomId,
+      room_id: selectedRoom.id,
       booking_date: date,
-      start_time: startTime,
-      end_time: endTime,
+      start_time: selectedStart,
+      end_time: selectedEnd,
       user_email: user.email || "",
     };
 
     setBookings((prev) => [...prev, optimisticBooking]);
 
     const { error } = await supabase.from("bookings").insert({
-      room_id: roomId,
+      room_id: selectedRoom.id,
       user_id: user.id,
       user_email: user.email,
       booking_date: date,
-      start_time: startTime,
-      end_time: endTime,
+      start_time: selectedStart,
+      end_time: selectedEnd,
     });
 
     if (error) {
@@ -309,6 +305,10 @@ export default function Home() {
       await loadData();
       return;
     }
+
+    setSelectedRoom(null);
+    setSelectedStart("");
+    setSelectedEnd("");
 
     await loadData();
     alert("Booking confirmed!");
@@ -371,11 +371,11 @@ export default function Home() {
       return;
     }
 
-    const selectedRoom = rooms.find(
+    const selectedRoomForModify = rooms.find(
       (room) => room.room_number.toLowerCase() === newRoomNumber.toLowerCase()
     );
 
-    if (!selectedRoom) {
+    if (!selectedRoomForModify) {
       alert("Room not found.");
       return;
     }
@@ -384,15 +384,15 @@ export default function Home() {
       .from("bookings")
       .select("*")
       .eq("booking_date", newDate)
-      .eq("room_id", selectedRoom.id)
+      .eq("room_id", selectedRoomForModify.id)
       .neq("id", booking.id);
 
-    const hasConflict =
+    const hasModifyConflict =
       conflicts?.some((existing) =>
         overlaps(existing.start_time, existing.end_time, newStart, newEnd)
       ) || false;
 
-    if (hasConflict) {
+    if (hasModifyConflict) {
       alert("That new time overlaps with another booking.");
       return;
     }
@@ -406,7 +406,7 @@ export default function Home() {
     const { error } = await supabase
       .from("bookings")
       .update({
-        room_id: selectedRoom.id,
+        room_id: selectedRoomForModify.id,
         booking_date: newDate,
         start_time: newStart,
         end_time: newEnd,
@@ -482,52 +482,58 @@ export default function Home() {
           )}
 
           {view === "booking" && (
-            <>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="border rounded-lg px-4 py-2"
-              />
-
-              <select
-                value={startTime}
-                onChange={(e) => {
-                  setStartTime(e.target.value);
-                  const currentEnd = timeToMinutes(endTime);
-                  const newStart = timeToMinutes(e.target.value);
-                  if (currentEnd <= newStart || currentEnd - newStart > 120) {
-                    setEndTime(endTimes[times.indexOf(e.target.value)]);
-                  }
-                }}
-                className="border rounded-lg px-4 py-2"
-              >
-                {times.map((time) => (
-                  <option key={time} value={time}>
-                    Start {time}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="border rounded-lg px-4 py-2"
-              >
-                {endTimes
-                  .filter((time) => {
-                    const diff = minutesBetween(startTime, time);
-                    return diff >= 30 && diff <= 120;
-                  })
-                  .map((time) => (
-                    <option key={time} value={time}>
-                      End {time}
-                    </option>
-                  ))}
-              </select>
-            </>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="border rounded-lg px-4 py-2 ml-auto"
+            />
           )}
         </div>
+
+        {selectedRoom && (
+          <div className="mb-6 bg-white p-5 rounded-xl shadow-sm border">
+            <h2 className="text-2xl font-bold mb-3">
+              Book {selectedRoom.room_number}
+            </h2>
+
+            <p className="text-gray-600 mb-4">
+              Date: {date} · Start: {selectedStart}
+            </p>
+
+            <label className="font-medium mr-3">End Time</label>
+
+            <select
+              value={selectedEnd}
+              onChange={(e) => setSelectedEnd(e.target.value)}
+              className="border rounded-lg px-4 py-2 mr-4"
+            >
+              {getEndOptions(selectedStart).map((time) => (
+                <option key={time} value={time}>
+                  {time}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={confirmBooking}
+              className="bg-black text-white px-5 py-2 rounded-lg hover:bg-gray-800 mr-3"
+            >
+              Confirm Booking
+            </button>
+
+            <button
+              onClick={() => {
+                setSelectedRoom(null);
+                setSelectedStart("");
+                setSelectedEnd("");
+              }}
+              className="border px-5 py-2 rounded-lg hover:bg-gray-100"
+            >
+              Cancel
+            </button>
+          </div>
+        )}
 
         {view === "booking" && (
           <div className="overflow-x-auto bg-white rounded-2xl shadow-lg border">
@@ -560,14 +566,7 @@ export default function Home() {
                             disabled={booked}
                             onClick={() => {
                               if (booked) return;
-
-                              const confirmed = window.confirm(
-                                `Confirm booking for ${room.room_number} from ${startTime} to ${endTime}?`
-                              );
-
-                              if (confirmed) {
-                                bookRoom(room.id);
-                              }
+                              openBookingPanel(room, time);
                             }}
                             className={
                               booked
@@ -688,4 +687,3 @@ export default function Home() {
     </main>
   );
 }
-
