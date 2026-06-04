@@ -132,7 +132,7 @@ export default function Home() {
 
   const currentRole = user?.email
     ? roles.find(
-        (r) => r.email.toLowerCase() === user.email?.toLowerCase()
+        (role) => role.email.toLowerCase() === user.email?.toLowerCase()
       )?.role
     : undefined;
 
@@ -151,9 +151,12 @@ export default function Home() {
       .order("role", { ascending: true })
       .order("email", { ascending: true });
 
-    if (!error) {
-      setRoles((data || []) as UserRole[]);
+    if (error) {
+      console.error(error.message);
+      return;
     }
+
+    setRoles((data || []) as UserRole[]);
   }
 
   async function loadData() {
@@ -195,9 +198,7 @@ export default function Home() {
   async function checkUser(currentUser: User | null) {
     if (
       currentUser &&
-      !allowedDomains.some((domain) =>
-        currentUser.email?.endsWith(domain)
-      )
+      !allowedDomains.some((domain) => currentUser.email?.endsWith(domain))
     ) {
       await supabase.auth.signOut();
       alert("Only TC or Columbia Google accounts are allowed.");
@@ -573,38 +574,33 @@ export default function Home() {
     alert("User role added or updated.");
   }
 
-  async function removeRole(roleId: string) {
+  async function removeRole(email: string) {
     if (!isAdmin) return;
 
-    const roleToRemove = roles.find((r) => r.id === roleId);
+    const normalizedEmail = email.trim().toLowerCase();
 
-    if (!roleToRemove) {
-      alert("Role not found.");
-      return;
-    }
-
-    if (backupAdminEmails.includes(roleToRemove.email.toLowerCase())) {
+    if (backupAdminEmails.includes(normalizedEmail)) {
       alert("Original backup admins cannot be removed.");
       return;
     }
 
-    const confirmed = window.confirm(
-      `Remove ${roleToRemove.email} as ${roleToRemove.role}?`
-    );
-
+    const confirmed = window.confirm(`Remove ${normalizedEmail}?`);
     if (!confirmed) return;
 
     const { error } = await supabase
       .from("user_roles")
       .delete()
-      .eq("email", roleToRemove.email);
+      .eq("email", normalizedEmail);
 
     if (error) {
       alert(error.message);
       return;
     }
 
-    await loadRoles();
+    setRoles((prev) =>
+      prev.filter((role) => role.email.toLowerCase() !== normalizedEmail)
+    );
+
     alert("Role removed.");
   }
 
@@ -896,7 +892,7 @@ export default function Home() {
             <div className="space-y-4">
               {roles.map((role) => (
                 <div
-                  key={role.id}
+                  key={role.email}
                   className="border rounded-xl p-4 flex items-center justify-between"
                 >
                   <div>
@@ -905,7 +901,7 @@ export default function Home() {
                   </div>
 
                   <button
-                    onClick={() => removeRole(role.id)}
+                    onClick={() => removeRole(role.email)}
                     className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
                   >
                     Remove
