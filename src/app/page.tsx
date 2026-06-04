@@ -18,6 +18,11 @@ type Booking = {
   user_email: string;
 };
 
+type Selection = {
+  room: Room;
+  start: string;
+} | null;
+
 const times = [
   "09:00", "09:30",
   "10:00", "10:30",
@@ -57,7 +62,12 @@ function timeToMinutes(time: string) {
 function minutesToTime(total: number) {
   const hour = Math.floor(total / 60);
   const minute = total % 60;
+
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function cellEnd(cellTime: string) {
+  return minutesToTime(timeToMinutes(cellTime) + 30);
 }
 
 function minutesBetween(start: string, end: string) {
@@ -76,19 +86,11 @@ function overlaps(
   );
 }
 
-function getEndOptions(start: string) {
-  const startMinutes = timeToMinutes(start);
-  const options = [];
+function isWeekend(selectedDate: string) {
+  const selectedDateObj = new Date(selectedDate + "T00:00:00");
+  const day = selectedDateObj.getDay();
 
-  for (let minutes = 30; minutes <= 120; minutes += 30) {
-    const end = startMinutes + minutes;
-
-    if (end <= 21 * 60) {
-      options.push(minutesToTime(end));
-    }
-  }
-
-  return options;
+  return day === 0 || day === 6;
 }
 
 function getWeekRange(selectedDate: string) {
@@ -115,10 +117,7 @@ export default function Home() {
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [view, setView] = useState<"booking" | "myBookings" | "admin">("booking");
-
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [selectedStart, setSelectedStart] = useState("");
-  const [selectedEnd, setSelectedEnd] = useState("");
+  const [selection, setSelection] = useState<Selection>(null);
 
   const isAdmin = user?.email ? adminEmails.includes(user.email) : false;
 
@@ -197,6 +196,7 @@ export default function Home() {
     await supabase.auth.signOut();
     setUser(null);
     setMyBookings([]);
+    setSelection(null);
     setView("booking");
   }
 
@@ -205,13 +205,13 @@ export default function Home() {
   }
 
   function isCellBooked(roomId: string, cellTime: string) {
-    const cellEnd = minutesToTime(timeToMinutes(cellTime) + 30);
+    const end = cellEnd(cellTime);
 
     return bookings.some(
       (booking) =>
         booking.room_id === roomId &&
         booking.booking_date === date &&
-        overlaps(booking.start_time, booking.end_time, cellTime, cellEnd)
+        overlaps(booking.start_time, booking.end_time, cellTime, end)
     );
   }
 
@@ -222,6 +222,43 @@ export default function Home() {
         booking.booking_date === date &&
         overlaps(booking.start_time, booking.end_time, start, end)
     );
+  }
+
+  function isPreviewCell(roomId: string, cellTime: string) {
+    if (!selection) return false;
+    if (selection.room.id !== roomId) return false;
+
+    const start = selection.start;
+    const end = cellEnd(cellTime);
+    const duration = minutesBetween(start, end);
+
+    return (
+      timeToMinutes(cellTime) >= timeToMinutes(start) &&
+      duration >= 30 &&
+      duration <= 120
+    );
+  }
+
+  async function checkDailyLimit(durationMinutes: number) {
+    if (!user?.email) return false;
+
+    const { data: dailyBookings } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("user_email", user.email)
+      .eq("booking_date", date);
+
+    const usedMinutes =
+      dailyBookings?.reduce((total, booking) => {
+        return total + minutesBetween(booking.start_time, booking.end_time);
+      }, 0) || 0;
+
+    if (usedMinutes + durationMinutes > 120) {
+      alert("You can only book up to 2 hours per day.");
+      return false;
+    }
+
+    return true;
   }
 
   async function checkWeeklyLimit(durationMinutes: number) {
@@ -249,56 +286,93 @@ export default function Home() {
     return true;
   }
 
-  function openBookingPanel(room: Room, start: string) {
+  async function handleCellClick(room: Room, time: string) {
     if (!user) {
       alert("Please log in with your TC or Columbia Google account before booking.");
       return;
     }
 
-    setSelectedRoom(room);
-    setSelectedStart(start);
-    setSelectedEnd(getEndOptions(start)[0]);
-  }
-
-  async function confirmBooking() {
-    if (!user || !selectedRoom || !selectedStart || !selectedEnd) return;
-
-    const duration = minutesBetween(selectedStart, selectedEnd);
-
-    if (duration < 30 || duration > 120) {
-      alert("Booking must be between 30 minutes and 2 hours.");
+    if (isWeekend(date)) {
+      alert("Weekend bookings are not allowed.");
       return;
     }
 
-    if (hasConflict(selectedRoom.id, selectedStart, selectedEnd)) {
-      alert("This room is already booked during that time.");
+    if (isCellBooked(room.id, time)) return;
+
+    if (!selection || selection.room.id !== room.id) {
+      setSelection({
+        room,
+        start: time,
+      });
+      return;
+    }
+
+    if (timeToMinutes(time) < timeToMinutes(selection.start)) {
+      setSelection({
+        room,
+        start: time,
+      });
+      return;
+    }
+
+    const start = selection.start;
+    const end = cellEnd(time);
+    const duration = minutesBetween(start, end);
+
+    if (duration < 30 || duration > 120) {
+      alert("One booking can only be 30 minutes to 2 hours.");
+      setSelection(null);
+      return;
+    }
+
+    if (hasConflict(room.id, start, end)) {
+      alert("This booking overlaps with an existing reservation.");
       await loadData();
+      setSelection(null);
       return;
     }
 
     if (!isAdmin) {
+      const dailyOk = await checkDailyLimit(duration);
+      if (!dailyOk) {
+        setSelection(null);
+        return;
+      }
+
       const weeklyOk = await checkWeeklyLimit(duration);
-      if (!weeklyOk) return;
+      if (!weeklyOk) {
+        setSelection(null);
+        return;
+      }
+    }
+
+    const confirmed = window.confirm(
+      `Confirm booking for ${room.room_number} from ${start} to ${end}?`
+    );
+
+    if (!confirmed) {
+      setSelection(null);
+      return;
     }
 
     const optimisticBooking: Booking = {
       id: crypto.randomUUID(),
-      room_id: selectedRoom.id,
+      room_id: room.id,
       booking_date: date,
-      start_time: selectedStart,
-      end_time: selectedEnd,
+      start_time: start,
+      end_time: end,
       user_email: user.email || "",
     };
 
     setBookings((prev) => [...prev, optimisticBooking]);
 
     const { error } = await supabase.from("bookings").insert({
-      room_id: selectedRoom.id,
+      room_id: room.id,
       user_id: user.id,
       user_email: user.email,
       booking_date: date,
-      start_time: selectedStart,
-      end_time: selectedEnd,
+      start_time: start,
+      end_time: end,
     });
 
     if (error) {
@@ -308,6 +382,7 @@ export default function Home() {
 
       alert("This room is already booked during that time.");
       await loadData();
+      setSelection(null);
       return;
     }
 
@@ -319,17 +394,14 @@ export default function Home() {
       body: JSON.stringify({
         type: "confirm",
         email: user.email,
-        room: selectedRoom.room_number,
+        room: room.room_number,
         date,
-        startTime: selectedStart,
-        endTime: selectedEnd,
+        startTime: start,
+        endTime: end,
       }),
     });
 
-    setSelectedRoom(null);
-    setSelectedStart("");
-    setSelectedEnd("");
-
+    setSelection(null);
     await loadData();
 
     alert("Booking confirmed!");
@@ -368,7 +440,6 @@ export default function Home() {
       }
 
       alert("Booking cancelled.");
-
       await loadData();
     }
   }
@@ -407,7 +478,6 @@ export default function Home() {
       }
 
       alert("Booking cancelled by admin.");
-
       await loadData();
     }
   }
@@ -415,6 +485,11 @@ export default function Home() {
   async function modifyBooking(booking: Booking) {
     const newDate = prompt("New date, format YYYY-MM-DD:", booking.booking_date);
     if (!newDate) return;
+
+    if (isWeekend(newDate)) {
+      alert("Weekend bookings are not allowed.");
+      return;
+    }
 
     const newRoomNumber = prompt("New room, example 515A:", roomName(booking.room_id));
     if (!newRoomNumber) return;
@@ -483,6 +558,16 @@ export default function Home() {
     }
   }
 
+  function handleDateChange(newDate: string) {
+    if (isWeekend(newDate)) {
+      alert("Weekend bookings are not allowed.");
+      return;
+    }
+
+    setSelection(null);
+    setDate(newDate);
+  }
+
   return (
     <main className="min-h-screen bg-gray-100 p-8">
       <div className="max-w-7xl mx-auto">
@@ -494,6 +579,16 @@ export default function Home() {
           <p className="text-gray-600 mt-2">
             Rooms 515A–515L · Monday–Friday · 9AM–9PM
           </p>
+
+          {selection && (
+            <p className="text-sm text-gray-700 mt-3">
+              Selected start:{" "}
+              <strong>
+                {selection.room.room_number} {selection.start}
+              </strong>
+              . Click an end cell in the same row to finish the booking.
+            </p>
+          )}
         </div>
 
         <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border flex gap-4 items-center flex-wrap">
@@ -532,6 +627,15 @@ export default function Home() {
               >
                 Log out
               </button>
+
+              {selection && (
+                <button
+                  onClick={() => setSelection(null)}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  Clear Selection
+                </button>
+              )}
             </>
           ) : (
             <button
@@ -546,55 +650,11 @@ export default function Home() {
             <input
               type="date"
               value={date}
-              onChange={(e) => setDate(e.target.value)}
+              onChange={(e) => handleDateChange(e.target.value)}
               className="border rounded-lg px-4 py-2 ml-auto"
             />
           )}
         </div>
-
-        {selectedRoom && (
-          <div className="mb-6 bg-white p-5 rounded-xl shadow-sm border">
-            <h2 className="text-2xl font-bold mb-3">
-              Book {selectedRoom.room_number}
-            </h2>
-
-            <p className="text-gray-600 mb-4">
-              Date: {date} · Start: {selectedStart}
-            </p>
-
-            <label className="font-medium mr-3">End Time</label>
-
-            <select
-              value={selectedEnd}
-              onChange={(e) => setSelectedEnd(e.target.value)}
-              className="border rounded-lg px-4 py-2 mr-4"
-            >
-              {getEndOptions(selectedStart).map((time) => (
-                <option key={time} value={time}>
-                  {time}
-                </option>
-              ))}
-            </select>
-
-            <button
-              onClick={confirmBooking}
-              className="bg-black text-white px-5 py-2 rounded-lg hover:bg-gray-800 mr-3"
-            >
-              Confirm Booking
-            </button>
-
-            <button
-              onClick={() => {
-                setSelectedRoom(null);
-                setSelectedStart("");
-                setSelectedEnd("");
-              }}
-              className="border px-5 py-2 rounded-lg hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-          </div>
-        )}
 
         {view === "booking" && (
           <div className="overflow-x-auto bg-white rounded-2xl shadow-lg border">
@@ -620,18 +680,18 @@ export default function Home() {
 
                     {times.map((time) => {
                       const booked = isCellBooked(room.id, time);
+                      const preview = isPreviewCell(room.id, time);
 
                       return (
                         <td key={time} className="border-b p-0">
                           <button
                             disabled={booked}
-                            onClick={() => {
-                              if (booked) return;
-                              openBookingPanel(room, time);
-                            }}
+                            onClick={() => handleCellClick(room, time)}
                             className={
                               booked
                                 ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 rounded-none"
+                                : preview
+                                ? "bg-gray-200 hover:bg-gray-200 w-full h-8 border border-gray-300 rounded-none"
                                 : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 rounded-none"
                             }
                           >
@@ -705,7 +765,7 @@ export default function Home() {
               <input
                 type="date"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => handleDateChange(e.target.value)}
                 className="border rounded-lg px-4 py-2"
               />
             </div>
