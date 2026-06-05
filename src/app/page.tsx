@@ -22,16 +22,32 @@ type Booking = {
 };
 
 type UserRole = {
+  id?: string;
   email: string;
   role: "admin" | "instructor";
 };
 
+type Selection = {
+  room: Room;
+  start: string;
+} | null;
+
 const times = [
-  "09:00", "09:30", "10:00", "10:30", "11:00", "11:30",
-  "12:00", "12:30", "13:00", "13:30", "14:00", "14:30",
-  "15:00", "15:30", "16:00", "16:30", "17:00", "17:30",
-  "18:00", "18:30", "19:00", "19:30", "20:00", "20:30",
+  "09:00", "09:30",
+  "10:00", "10:30",
+  "11:00", "11:30",
+  "12:00", "12:30",
+  "13:00", "13:30",
+  "14:00", "14:30",
+  "15:00", "15:30",
+  "16:00", "16:30",
+  "17:00", "17:30",
+  "18:00", "18:30",
+  "19:00", "19:30",
+  "20:00", "20:30",
 ];
+
+const allowedDomains = ["@tc.columbia.edu", "@columbia.edu"];
 
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
@@ -42,7 +58,9 @@ const backupAdminEmails = [
 
 function localToday() {
   const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
 }
 
 function cleanTime(time: string) {
@@ -55,15 +73,24 @@ function timeToMinutes(time: string) {
 }
 
 function minutesToTime(total: number) {
-  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(
+    total % 60
+  ).padStart(2, "0")}`;
 }
 
 function cellEnd(time: string) {
   return minutesToTime(timeToMinutes(time) + 30);
 }
 
+function minutesBetween(start: string, end: string) {
+  return timeToMinutes(end) - timeToMinutes(start);
+}
+
 function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
-  return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(aEnd) > timeToMinutes(bStart);
+  return (
+    timeToMinutes(aStart) < timeToMinutes(bEnd) &&
+    timeToMinutes(aEnd) > timeToMinutes(bStart)
+  );
 }
 
 function isWeekend(date: string) {
@@ -77,11 +104,13 @@ function isPastDate(date: string) {
 
 function isPastTime(date: string, time: string) {
   const today = localToday();
+
   if (date < today) return true;
   if (date > today) return false;
 
   const now = new Date();
   const current = now.getHours() * 60 + now.getMinutes();
+
   return timeToMinutes(time) < current;
 }
 
@@ -116,15 +145,20 @@ function getWeekRange(selectedDate: string) {
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
+
   const [rooms, setRooms] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [adminBookings, setAdminBookings] = useState<Booking[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
 
+  const [newRoleEmail, setNewRoleEmail] = useState("");
+  const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
+
   const [date, setDate] = useState(localToday());
-  const [selectedRoom, setSelectedRoom] = useState<Room | null>(null);
-  const [selectedStart, setSelectedStart] = useState<string | null>(null);
+  const [view, setView] = useState<"booking" | "myBookings" | "admin" | "roles">("booking");
+
+  const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
 
   const [showRecurringModal, setShowRecurringModal] = useState(false);
@@ -194,13 +228,27 @@ export default function Home() {
     }
   }
 
+  async function checkUser(currentUser: User | null) {
+    if (
+      currentUser &&
+      !allowedDomains.some((domain) => currentUser.email?.endsWith(domain))
+    ) {
+      await supabase.auth.signOut();
+      alert("Only TC or Columbia Google accounts are allowed.");
+      setUser(null);
+      return;
+    }
+
+    setUser(currentUser);
+  }
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      setUser(data.user);
+      checkUser(data.user);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
+      checkUser(session?.user || null);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -222,7 +270,11 @@ export default function Home() {
   async function logout() {
     await supabase.auth.signOut();
     setUser(null);
-    location.reload();
+    setMyBookings([]);
+    setAdminBookings([]);
+    setSelection(null);
+    setHoverTime(null);
+    setView("booking");
   }
 
   function roomName(roomId: string) {
@@ -235,65 +287,93 @@ export default function Home() {
     return bookings.some(
       (b) =>
         b.room_id === roomId &&
-        overlaps(b.start_time, b.end_time, time, end)
+        overlaps(b.start_time, b.end_time, time, end) &&
+        !bookingEnded(b)
+    );
+  }
+
+  function hasConflict(roomId: string, start: string, end: string) {
+    return bookings.some(
+      (b) =>
+        b.room_id === roomId &&
+        overlaps(b.start_time, b.end_time, start, end) &&
+        !bookingEnded(b)
     );
   }
 
   function isPreview(roomId: string, time: string) {
-    if (!selectedRoom || !selectedStart || !hoverTime) return false;
-    if (selectedRoom.id !== roomId) return false;
+    if (!selection || !hoverTime) return false;
+    if (selection.room.id !== roomId) return false;
 
-    const previewEnd = cellEnd(hoverTime);
+    const end = cellEnd(hoverTime);
 
     return (
-      timeToMinutes(time) >= timeToMinutes(selectedStart) &&
-      timeToMinutes(time) < timeToMinutes(previewEnd)
+      timeToMinutes(time) >= timeToMinutes(selection.start) &&
+      timeToMinutes(time) < timeToMinutes(end)
     );
   }
 
-  async function checkDailyLimit(duration: number) {
-    if (!user?.email) return false;
+  async function checkSuspension() {
+    if (!user?.email || hasUnlimitedBooking) return false;
 
     const { data } = await supabase
+      .from("user_suspensions")
+      .select("*")
+      .eq("email", user.email)
+      .eq("active", true)
+      .maybeSingle();
+
+    if (data) {
+      alert("Your booking access is temporarily suspended due to repeated no-shows.");
+      return true;
+    }
+
+    return false;
+  }
+
+  async function checkDailyLimit(durationMinutes: number) {
+    if (!user?.email) return false;
+
+    const { data: dailyBookings } = await supabase
       .from("bookings")
       .select("*")
       .eq("user_email", user.email)
       .eq("booking_date", date);
 
-    const used =
-      data?.reduce((total, b) => {
-        if (bookingEnded(b)) return total;
-        return total + (timeToMinutes(b.end_time) - timeToMinutes(b.start_time));
+    const usedMinutes =
+      dailyBookings?.reduce((total, booking) => {
+        if (bookingEnded(booking)) return total;
+        return total + minutesBetween(booking.start_time, booking.end_time);
       }, 0) || 0;
 
-    if (used + duration > 120) {
-      alert("Students can only book 2 hours per day.");
+    if (usedMinutes + durationMinutes > 120) {
+      alert("You can only book up to 2 hours per day.");
       return false;
     }
 
     return true;
   }
 
-  async function checkWeeklyLimit(duration: number) {
+  async function checkWeeklyLimit(durationMinutes: number) {
     if (!user?.email) return false;
 
     const { start, end } = getWeekRange(date);
 
-    const { data } = await supabase
+    const { data: weeklyBookings } = await supabase
       .from("bookings")
       .select("*")
       .eq("user_email", user.email)
       .gte("booking_date", start)
       .lte("booking_date", end);
 
-    const used =
-      data?.reduce((total, b) => {
-        if (bookingEnded(b)) return total;
-        return total + (timeToMinutes(b.end_time) - timeToMinutes(b.start_time));
+    const usedMinutes =
+      weeklyBookings?.reduce((total, booking) => {
+        if (bookingEnded(booking)) return total;
+        return total + minutesBetween(booking.start_time, booking.end_time);
       }, 0) || 0;
 
-    if (used + duration > 300) {
-      alert("Students can only book 5 hours per week.");
+    if (usedMinutes + durationMinutes > 300) {
+      alert("You can only book up to 5 hours per week.");
       return false;
     }
 
@@ -306,13 +386,21 @@ export default function Home() {
       return;
     }
 
-    if (isPastDate(date) || isPastTime(date, time)) {
-      alert("Cannot book past time.");
+    const suspended = await checkSuspension();
+    if (suspended) return;
+
+    if (isPastDate(date)) {
+      alert("Cannot book past dates.");
       return;
     }
 
     if (isWeekend(date)) {
       alert("Weekend bookings are not allowed.");
+      return;
+    }
+
+    if (isPastTime(date, time)) {
+      alert("Cannot book past times.");
       return;
     }
 
@@ -323,60 +411,63 @@ export default function Home() {
 
     if (isBooked(room.id, time)) return;
 
-    if (!selectedRoom || selectedRoom.id !== room.id) {
-      setSelectedRoom(room);
-      setSelectedStart(time);
+    if (!selection || selection.room.id !== room.id) {
+      setSelection({ room, start: time });
       setHoverTime(time);
       return;
     }
 
-    if (timeToMinutes(time) < timeToMinutes(selectedStart || time)) {
-      setSelectedRoom(room);
-      setSelectedStart(time);
+    if (timeToMinutes(time) < timeToMinutes(selection.start)) {
+      setSelection({ room, start: time });
       setHoverTime(time);
       return;
     }
 
-    const start = selectedStart!;
+    const start = selection.start;
     const end = cellEnd(time);
-    const duration = timeToMinutes(end) - timeToMinutes(start);
+    const duration = minutesBetween(start, end);
+
+    if (duration < 30) {
+      alert("Minimum booking time is 30 minutes.");
+      setSelection(null);
+      setHoverTime(null);
+      return;
+    }
 
     if (!hasUnlimitedBooking && duration > 120) {
       alert("Students can only book up to 2 hours at once.");
-      setSelectedRoom(null);
-      setSelectedStart(null);
+      setSelection(null);
       setHoverTime(null);
       return;
     }
 
-    const conflict = bookings.some(
-      (b) =>
-        b.room_id === room.id &&
-        overlaps(b.start_time, b.end_time, start, end)
-    );
-
-    if (conflict) {
+    if (hasConflict(room.id, start, end)) {
       alert("This room is already booked.");
-      setSelectedRoom(null);
-      setSelectedStart(null);
+      setSelection(null);
       setHoverTime(null);
+      await loadData();
       return;
     }
 
     if (!hasUnlimitedBooking) {
       const dailyOk = await checkDailyLimit(duration);
-      if (!dailyOk) return;
+      if (!dailyOk) {
+        setSelection(null);
+        setHoverTime(null);
+        return;
+      }
 
       const weeklyOk = await checkWeeklyLimit(duration);
-      if (!weeklyOk) return;
+      if (!weeklyOk) {
+        setSelection(null);
+        setHoverTime(null);
+        return;
+      }
     }
 
-    const remark = window.prompt("Optional remark/note:", "") || "";
+    const remark = window.prompt("Optional note/remark for this booking:", "") || "";
 
-    const confirmed = window.confirm(
-      `Book ${room.room_number} from ${start} to ${end}?`
-    );
-
+    const confirmed = window.confirm(`Book ${room.room_number} from ${start} to ${end}?`);
     if (!confirmed) return;
 
     const { error } = await supabase.from("bookings").insert({
@@ -396,10 +487,8 @@ export default function Home() {
       return;
     }
 
-    setSelectedRoom(null);
-    setSelectedStart(null);
+    setSelection(null);
     setHoverTime(null);
-
     await loadData();
 
     alert("Booked.");
@@ -417,6 +506,7 @@ export default function Home() {
     }
 
     await loadData();
+    alert("Cancelled.");
   }
 
   async function cancelSeries(seriesId: string) {
@@ -458,6 +548,67 @@ export default function Home() {
     }
 
     await loadData();
+    alert("Description updated.");
+  }
+
+  async function addRole() {
+    if (!isAdmin) return;
+
+    const normalizedEmail = newRoleEmail.trim().toLowerCase();
+
+    if (
+      !normalizedEmail.endsWith("@tc.columbia.edu") &&
+      !normalizedEmail.endsWith("@columbia.edu")
+    ) {
+      alert("Only TC or Columbia emails can be added.");
+      return;
+    }
+
+    const { error } = await supabase.from("user_roles").upsert(
+      {
+        email: normalizedEmail,
+        role: newRoleType,
+      },
+      {
+        onConflict: "email",
+      }
+    );
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setNewRoleEmail("");
+    await loadData();
+    alert("User role added or updated.");
+  }
+
+  async function removeRole(email: string) {
+    if (!isAdmin) return;
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    if (backupAdminEmails.includes(normalizedEmail)) {
+      alert("Original backup admins cannot be removed.");
+      return;
+    }
+
+    const confirmed = window.confirm(`Remove ${normalizedEmail}?`);
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from("user_roles")
+      .delete()
+      .eq("email", normalizedEmail);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadData();
+    alert("Role removed.");
   }
 
   async function createRecurringBooking() {
@@ -489,6 +640,22 @@ export default function Home() {
 
     setShowRecurringModal(false);
     await loadData();
+  }
+
+  function handleDateChange(newDate: string) {
+    if (isPastDate(newDate)) {
+      alert("You cannot book a past date.");
+      return;
+    }
+
+    if (isWeekend(newDate)) {
+      alert("Weekend bookings are not allowed.");
+      return;
+    }
+
+    setSelection(null);
+    setHoverTime(null);
+    setDate(newDate);
   }
 
   return (
@@ -599,13 +766,13 @@ export default function Home() {
               Rooms 515A–515L · Monday–Friday · 9AM–9PM
             </p>
 
-            {selectedRoom && selectedStart && (
+            {selection && (
               <p className="text-sm text-gray-700 mt-3">
                 Selected start:{" "}
                 <strong>
-                  {selectedRoom.room_number} {selectedStart}
+                  {selection.room.room_number} {selection.start}
                 </strong>
-                . Move cursor to preview, then click end cell.
+                . Move your cursor to preview, then click an end cell.
               </p>
             )}
           </div>
@@ -620,10 +787,17 @@ export default function Home() {
                 </span>
 
                 <button
-                  onClick={logout}
+                  onClick={() => setView("booking")}
                   className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                 >
-                  Log out
+                  Book Room
+                </button>
+
+                <button
+                  onClick={() => setView("myBookings")}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  My Bookings
                 </button>
 
                 {hasUnlimitedBooking && (
@@ -644,11 +818,35 @@ export default function Home() {
                   </>
                 )}
 
-                {selectedRoom && (
+                {isAdmin && (
+                  <>
+                    <button
+                      onClick={() => setView("admin")}
+                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                    >
+                      Admin Bookings
+                    </button>
+
+                    <button
+                      onClick={() => setView("roles")}
+                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                    >
+                      Manage Roles
+                    </button>
+                  </>
+                )}
+
+                <button
+                  onClick={logout}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  Log out
+                </button>
+
+                {selection && (
                   <button
                     onClick={() => {
-                      setSelectedRoom(null);
-                      setSelectedStart(null);
+                      setSelection(null);
                       setHoverTime(null);
                     }}
                     className="border px-4 py-2 rounded-lg hover:bg-gray-100"
@@ -666,160 +864,281 @@ export default function Home() {
               </button>
             )}
 
-            <input
-              type="date"
-              value={date}
-              min={localToday()}
-              onChange={(e) => {
-                if (isWeekend(e.target.value)) {
-                  alert("Weekend bookings are not allowed.");
-                  return;
-                }
-                setDate(e.target.value);
-              }}
-              className="border rounded-lg px-4 py-2 ml-auto"
-            />
+            {view === "booking" && (
+              <input
+                type="date"
+                value={date}
+                min={localToday()}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="border rounded-lg px-4 py-2 ml-auto"
+              />
+            )}
           </div>
 
-          <div className="overflow-x-auto bg-white rounded-2xl shadow-lg border">
-            <table className="w-full border-collapse text-center">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="p-4 text-left border-b">Room</th>
+          {view === "booking" && (
+            <div className="overflow-x-auto bg-white rounded-2xl shadow-lg border">
+              <table className="w-full border-collapse text-center">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="p-4 text-left border-b">Room</th>
 
-                  {times.map((time) => (
-                    <th key={time} className="p-3 text-sm font-medium border-b">
-                      {time}
-                    </th>
+                    {times.map((time) => (
+                      <th key={time} className="p-3 text-sm font-medium border-b">
+                        {time}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {rooms.map((room) => (
+                    <tr key={room.id}>
+                      <td className="p-4 border-b font-semibold bg-gray-50 text-left">
+                        <div>{room.room_number}</div>
+
+                        {room.description && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            {room.description}
+                          </div>
+                        )}
+
+                        {room.room_number === "515K" && (
+                          <div className="text-xs text-red-500 mt-1">
+                            Instructor/Admin only
+                          </div>
+                        )}
+
+                        {isAdmin && (
+                          <button
+                            onClick={() => updateRoomDescription(room)}
+                            className="text-xs text-blue-600 underline mt-1"
+                          >
+                            Edit description
+                          </button>
+                        )}
+                      </td>
+
+                      {times.map((time) => {
+                        const booked = isBooked(room.id, time);
+                        const preview = isPreview(room.id, time);
+                        const past = isPastTime(date, time);
+
+                        return (
+                          <td key={time} className="border-b p-0">
+                            <button
+                              disabled={booked || past || isPastDate(date)}
+                              onMouseEnter={() => {
+                                if (selection?.room.id === room.id) {
+                                  setHoverTime(time);
+                                }
+                              }}
+                              onClick={() => handleCellClick(room, time)}
+                              className={
+                                booked
+                                  ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 text-xs"
+                                  : past || isPastDate(date)
+                                  ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 text-xs"
+                                  : preview
+                                  ? "bg-gray-200 w-full h-8 border border-gray-300 text-xs"
+                                  : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
+                              }
+                            >
+                              {booked ? "Booked" : ""}
+                            </button>
+                          </td>
+                        );
+                      })}
+                    </tr>
                   ))}
-                </tr>
-              </thead>
+                </tbody>
+              </table>
+            </div>
+          )}
 
-              <tbody>
-                {rooms.map((room) => (
-                  <tr key={room.id}>
-                    <td className="p-4 border-b font-semibold bg-gray-50 text-left">
-                      <div>{room.room_number}</div>
+          {view === "myBookings" && (
+            <div className="bg-white rounded-2xl shadow-lg border p-6">
+              <h2 className="text-3xl font-bold mb-6">My Bookings</h2>
 
-                      {room.description && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          {room.description}
-                        </div>
+              {myBookings.length === 0 && (
+                <p className="text-gray-600">No active bookings.</p>
+              )}
+
+              <div className="space-y-4">
+                {myBookings.map((booking) => (
+                  <div
+                    key={booking.id}
+                    className="border rounded-xl p-4 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-lg">
+                        {roomName(booking.room_id)}
+                      </p>
+
+                      <p className="text-gray-600">
+                        {booking.booking_date} · {cleanTime(booking.start_time)}–
+                        {cleanTime(booking.end_time)}
+                      </p>
+
+                      {booking.remark && (
+                        <p className="text-gray-500 text-sm">
+                          Remark: {booking.remark}
+                        </p>
                       )}
 
-                      {isAdmin && (
+                      {booking.recurring_series_id && (
+                        <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">
+                          Recurring
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => cancelBooking(booking.id)}
+                        className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                      >
+                        Cancel
+                      </button>
+
+                      {booking.recurring_series_id && hasUnlimitedBooking && (
                         <button
-                          onClick={() => updateRoomDescription(room)}
-                          className="text-xs text-blue-600 underline mt-1"
+                          onClick={() => cancelSeries(booking.recurring_series_id!)}
+                          className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                         >
-                          Edit description
+                          Cancel Series
                         </button>
                       )}
-
-                      {room.room_number === "515K" && (
-                        <div className="text-xs text-red-500 mt-1">
-                          Instructor/Admin only
-                        </div>
-                      )}
-                    </td>
-
-                    {times.map((time) => {
-                      const booked = isBooked(room.id, time);
-                      const preview = isPreview(room.id, time);
-                      const past = isPastTime(date, time);
-
-                      return (
-                        <td key={time} className="border-b p-0">
-                          <button
-                            disabled={booked || past || isPastDate(date)}
-                            onMouseEnter={() => {
-                              if (selectedRoom?.id === room.id) {
-                                setHoverTime(time);
-                              }
-                            }}
-                            onClick={() => handleCellClick(room, time)}
-                            className={
-                              booked
-                                ? "bg-gray-300 text-gray-700 w-full h-8 cursor-not-allowed border border-gray-300 text-xs"
-                                : past || isPastDate(date)
-                                ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 text-xs"
-                                : preview
-                                ? "bg-gray-200 w-full h-8 border border-gray-300 text-xs"
-                                : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
-                            }
-                          >
-                            {booked ? "Booked" : ""}
-                          </button>
-                        </td>
-                      );
-                    })}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-lg border p-6 mt-8">
-            <h2 className="text-3xl font-bold mb-6">Active Bookings</h2>
-
-            {(hasUnlimitedBooking ? adminBookings : myBookings).length === 0 && (
-              <p className="text-gray-600">No active bookings.</p>
-            )}
-
-            <div className="space-y-4">
-              {(hasUnlimitedBooking ? adminBookings : myBookings).map((booking) => (
-                <div
-                  key={booking.id}
-                  className="border rounded-xl p-4 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="font-semibold text-lg">
-                      {roomName(booking.room_id)}
-                    </p>
-
-                    <p className="text-gray-600">
-                      {booking.booking_date} · {cleanTime(booking.start_time)}–
-                      {cleanTime(booking.end_time)}
-                    </p>
-
-                    <p className="text-gray-500 text-sm">
-                      {booking.user_email}
-                    </p>
-
-                    {booking.remark && (
-                      <p className="text-gray-500 text-sm">
-                        Remark: {booking.remark}
-                      </p>
-                    )}
-
-                    {booking.recurring_series_id && (
-                      <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">
-                        Recurring
-                      </span>
-                    )}
+                    </div>
                   </div>
+                ))}
+              </div>
+            </div>
+          )}
 
-                  <div className="flex gap-2">
+          {view === "admin" && isAdmin && (
+            <div className="bg-white rounded-2xl shadow-lg border p-6">
+              <h2 className="text-3xl font-bold mb-6">Admin: Active Bookings</h2>
+
+              {adminBookings.length === 0 && (
+                <p className="text-gray-600">No active bookings.</p>
+              )}
+
+              <div className="space-y-4">
+                {adminBookings.map((booking) => (
+                  <div
+                    key={booking.id}
+                    className="border rounded-xl p-4 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold text-lg">
+                        {roomName(booking.room_id)}
+                      </p>
+
+                      <p className="text-gray-600">
+                        {booking.booking_date} · {cleanTime(booking.start_time)}–
+                        {cleanTime(booking.end_time)}
+                      </p>
+
+                      <p className="text-gray-500 text-sm">
+                        {booking.user_email}
+                      </p>
+
+                      {booking.remark && (
+                        <p className="text-gray-500 text-sm">
+                          Remark: {booking.remark}
+                        </p>
+                      )}
+
+                      {booking.recurring_series_id && (
+                        <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">
+                          Recurring
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => cancelBooking(booking.id)}
+                        className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                      >
+                        Cancel
+                      </button>
+
+                      {booking.recurring_series_id && (
+                        <button
+                          onClick={() => cancelSeries(booking.recurring_series_id!)}
+                          className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                        >
+                          Cancel Series
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {view === "roles" && isAdmin && (
+            <div className="bg-white rounded-2xl shadow-lg border p-6">
+              <h2 className="text-3xl font-bold mb-6">
+                Manage Instructors & Admins
+              </h2>
+
+              <div className="flex gap-3 mb-6 flex-wrap">
+                <input
+                  type="email"
+                  placeholder="UNI@tc.columbia.edu"
+                  value={newRoleEmail}
+                  onChange={(e) => setNewRoleEmail(e.target.value)}
+                  className="border rounded-lg px-4 py-2"
+                />
+
+                <select
+                  value={newRoleType}
+                  onChange={(e) =>
+                    setNewRoleType(e.target.value as "admin" | "instructor")
+                  }
+                  className="border rounded-lg px-4 py-2"
+                >
+                  <option value="instructor">Instructor</option>
+                  <option value="admin">Admin</option>
+                </select>
+
+                <button
+                  onClick={addRole}
+                  className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                >
+                  Add / Update Role
+                </button>
+              </div>
+
+              {roles.length === 0 && (
+                <p className="text-gray-600">No roles added yet.</p>
+              )}
+
+              <div className="space-y-4">
+                {roles.map((role) => (
+                  <div
+                    key={role.email}
+                    className="border rounded-xl p-4 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold">{role.email}</p>
+                      <p className="text-gray-600 capitalize">{role.role}</p>
+                    </div>
+
                     <button
-                      onClick={() => cancelBooking(booking.id)}
+                      onClick={() => removeRole(role.email)}
                       className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
                     >
-                      Cancel
+                      Remove
                     </button>
-
-                    {booking.recurring_series_id && hasUnlimitedBooking && (
-                      <button
-                        onClick={() => cancelSeries(booking.recurring_series_id!)}
-                        className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                      >
-                        Cancel Series
-                      </button>
-                    )}
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </main>
     </>
