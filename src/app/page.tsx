@@ -78,7 +78,12 @@ function minutesBetween(start: string, end: string) {
   return timeToMinutes(end) - timeToMinutes(start);
 }
 
-function overlaps(existingStart: string, existingEnd: string, newStart: string, newEnd: string) {
+function overlaps(
+  existingStart: string,
+  existingEnd: string,
+  newStart: string,
+  newEnd: string
+) {
   return (
     timeToMinutes(existingStart) < timeToMinutes(newEnd) &&
     timeToMinutes(existingEnd) > timeToMinutes(newStart)
@@ -89,6 +94,16 @@ function isWeekend(selectedDate: string) {
   const selectedDateObj = new Date(selectedDate + "T00:00:00");
   const day = selectedDateObj.getDay();
   return day === 0 || day === 6;
+}
+
+function isPastTime(selectedDate: string, time: string) {
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+
+  if (selectedDate !== today) return false;
+
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  return timeToMinutes(time) < currentMinutes;
 }
 
 function getWeekRange(selectedDate: string) {
@@ -117,16 +132,20 @@ export default function Home() {
   const [roles, setRoles] = useState<UserRole[]>([]);
 
   const [newRoleEmail, setNewRoleEmail] = useState("");
-  const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
+  const [newRoleType, setNewRoleType] =
+    useState<"admin" | "instructor">("instructor");
 
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [view, setView] = useState<"booking" | "myBookings" | "admin" | "roles">("booking");
+  const [view, setView] =
+    useState<"booking" | "myBookings" | "admin" | "roles">("booking");
 
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
 
   const currentRole = user?.email
-    ? roles.find((role) => role.email.toLowerCase() === user.email?.toLowerCase())?.role
+    ? roles.find(
+        (role) => role.email.toLowerCase() === user.email?.toLowerCase()
+      )?.role
     : undefined;
 
   const isBackupAdmin = user?.email
@@ -247,11 +266,14 @@ export default function Home() {
   function isCellBooked(roomId: string, cellTime: string) {
     const end = cellEnd(cellTime);
 
+    if (isPastTime(date, end)) return false;
+
     return bookings.some(
       (booking) =>
         booking.room_id === roomId &&
         booking.booking_date === date &&
-        overlaps(booking.start_time, booking.end_time, cellTime, end)
+        overlaps(booking.start_time, booking.end_time, cellTime, end) &&
+        !isPastTime(date, cleanTime(booking.end_time))
     );
   }
 
@@ -260,7 +282,8 @@ export default function Home() {
       (booking) =>
         booking.room_id === roomId &&
         booking.booking_date === date &&
-        overlaps(booking.start_time, booking.end_time, start, end)
+        overlaps(booking.start_time, booking.end_time, start, end) &&
+        !isPastTime(date, cleanTime(booking.end_time))
     );
   }
 
@@ -356,6 +379,11 @@ export default function Home() {
 
     if (isWeekend(date)) {
       alert("Weekend bookings are not allowed.");
+      return;
+    }
+
+    if (isPastTime(date, time)) {
+      alert("You cannot book a past time.");
       return;
     }
 
@@ -483,7 +511,7 @@ export default function Home() {
     alert(
       hasUnlimitedBooking
         ? "Booking confirmed. Instructor/admin bookings do not require check-in."
-        : "Booking confirmed. Please scan the room QR code to check in when you arrive."
+        : "Booking confirmed."
     );
   }
 
@@ -759,11 +787,12 @@ export default function Home() {
                     {times.map((time) => {
                       const booked = isCellBooked(room.id, time);
                       const preview = isPreviewCell(room.id, time);
+                      const past = isPastTime(date, time);
 
                       return (
                         <td key={time} className="border-b p-0">
                           <button
-                            disabled={booked}
+                            disabled={booked || past}
                             onMouseEnter={() => {
                               if (selection?.room.id === room.id) {
                                 setHoverTime(time);
@@ -773,6 +802,8 @@ export default function Home() {
                             className={
                               booked
                                 ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 rounded-none"
+                                : past
+                                ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 rounded-none"
                                 : preview
                                 ? "bg-gray-200 hover:bg-gray-200 w-full h-8 border border-gray-300 rounded-none"
                                 : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 rounded-none"
@@ -813,12 +844,6 @@ export default function Home() {
                       {booking.booking_date} · {cleanTime(booking.start_time)}–
                       {cleanTime(booking.end_time)}
                     </p>
-
-                    {!hasUnlimitedBooking && (
-                      <p className="text-gray-500 text-sm">
-                        Check-in required by scanning the room QR code.
-                      </p>
-                    )}
                   </div>
 
                   <button
@@ -859,10 +884,6 @@ export default function Home() {
 
                     <p className="text-gray-500 text-sm">
                       {booking.user_email}
-                    </p>
-
-                    <p className="text-gray-500 text-sm">
-                      Checked in: {booking.checked_in ? "Yes" : "No"}
                     </p>
                   </div>
 
