@@ -7,8 +7,11 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-function formatDate(date: Date) {
-  return date.toISOString().split("T")[0];
+function localDateString(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 export async function POST(req: Request) {
@@ -25,7 +28,11 @@ export async function POST(req: Request) {
     email,
   } = body;
 
-  const seriesId = randomUUID();
+  if (!room || !startDate || !endDate || !weekday || !startTime || !endTime || !email) {
+    return NextResponse.json({
+      message: "Missing required fields.",
+    });
+  }
 
   const { data: roomData } = await supabase
     .from("practice_rooms")
@@ -34,19 +41,32 @@ export async function POST(req: Request) {
     .single();
 
   if (!roomData) {
-    return NextResponse.json({ message: "Room not found" });
+    return NextResponse.json({
+      message: "Room not found.",
+    });
   }
 
+  const seriesId = randomUUID();
   const start = new Date(startDate + "T00:00:00");
   const end = new Date(endDate + "T00:00:00");
 
   let created = 0;
-  let skipped = 0;
+  let skippedConflicts = 0;
+  let skippedWeekends = 0;
 
   for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-    if (d.getDay() !== Number(weekday)) continue;
+    const day = d.getDay();
 
-    const bookingDate = formatDate(d);
+    if (day === 0 || day === 6) {
+      skippedWeekends++;
+      continue;
+    }
+
+    if (day !== Number(weekday)) {
+      continue;
+    }
+
+    const bookingDate = localDateString(d);
 
     const { data: conflict } = await supabase
       .from("bookings")
@@ -57,25 +77,27 @@ export async function POST(req: Request) {
       .gt("end_time", startTime);
 
     if (conflict && conflict.length > 0) {
-      skipped++;
+      skippedConflicts++;
       continue;
     }
 
-    await supabase.from("bookings").insert({
+    const { error } = await supabase.from("bookings").insert({
       room_id: roomData.id,
       booking_date: bookingDate,
       start_time: startTime,
       end_time: endTime,
       user_email: email,
-      remark,
+      remark: remark || "",
       checked_in: true,
       recurring_series_id: seriesId,
     });
 
-    created++;
+    if (!error) {
+      created++;
+    }
   }
 
   return NextResponse.json({
-    message: `Created ${created} recurring bookings. Skipped ${skipped} conflicts.`,
+    message: `Created ${created} recurring bookings. Skipped ${skippedConflicts} conflicts. Weekends are never included.`,
   });
 }
