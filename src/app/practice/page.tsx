@@ -901,6 +901,14 @@ export default function Home() {
                     >
                       Classrooms
                     </button>
+
+<button
+  onClick={() => (window.location.href = "/equipment")}
+  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+>
+  Equipment
+</button>
+
                   </>
                 )}
 
