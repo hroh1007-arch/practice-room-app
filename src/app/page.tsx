@@ -59,6 +59,14 @@ function cleanTime(time: string) {
   return time.slice(0, 5);
 }
 
+function localToday() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function timeToMinutes(time: string) {
   const [hour, minute] = cleanTime(time).split(":").map(Number);
   return hour * 60 + minute;
@@ -78,12 +86,7 @@ function minutesBetween(start: string, end: string) {
   return timeToMinutes(end) - timeToMinutes(start);
 }
 
-function overlaps(
-  existingStart: string,
-  existingEnd: string,
-  newStart: string,
-  newEnd: string
-) {
+function overlaps(existingStart: string, existingEnd: string, newStart: string, newEnd: string) {
   return (
     timeToMinutes(existingStart) < timeToMinutes(newEnd) &&
     timeToMinutes(existingEnd) > timeToMinutes(newStart)
@@ -96,14 +99,32 @@ function isWeekend(selectedDate: string) {
   return day === 0 || day === 6;
 }
 
+function isPastDate(selectedDate: string) {
+  return selectedDate < localToday();
+}
+
 function isPastTime(selectedDate: string, time: string) {
+  const today = localToday();
+
+  if (selectedDate < today) return true;
+  if (selectedDate > today) return false;
+
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
-
-  if (selectedDate !== today) return false;
-
   const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
   return timeToMinutes(time) < currentMinutes;
+}
+
+function bookingHasEnded(booking: Booking) {
+  const today = localToday();
+
+  if (booking.booking_date < today) return true;
+  if (booking.booking_date > today) return false;
+
+  const now = new Date();
+  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+  return timeToMinutes(booking.end_time) <= currentMinutes;
 }
 
 function getWeekRange(selectedDate: string) {
@@ -132,20 +153,16 @@ export default function Home() {
   const [roles, setRoles] = useState<UserRole[]>([]);
 
   const [newRoleEmail, setNewRoleEmail] = useState("");
-  const [newRoleType, setNewRoleType] =
-    useState<"admin" | "instructor">("instructor");
+  const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
 
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [view, setView] =
-    useState<"booking" | "myBookings" | "admin" | "roles">("booking");
+  const [date, setDate] = useState(localToday());
+  const [view, setView] = useState<"booking" | "myBookings" | "admin" | "roles">("booking");
 
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
 
   const currentRole = user?.email
-    ? roles.find(
-        (role) => role.email.toLowerCase() === user.email?.toLowerCase()
-      )?.role
+    ? roles.find((role) => role.email.toLowerCase() === user.email?.toLowerCase())?.role
     : undefined;
 
   const isBackupAdmin = user?.email
@@ -188,7 +205,7 @@ export default function Home() {
         .order("booking_date", { ascending: true })
         .order("start_time", { ascending: true });
 
-      setMyBookings(mine || []);
+      setMyBookings((mine || []).filter((booking) => !bookingHasEnded(booking)));
     }
 
     if (isAdmin) {
@@ -198,7 +215,7 @@ export default function Home() {
         .order("booking_date", { ascending: true })
         .order("start_time", { ascending: true });
 
-      setAdminBookings(all || []);
+      setAdminBookings((all || []).filter((booking) => !bookingHasEnded(booking)));
     }
   }
 
@@ -236,9 +253,8 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    loadRoles();
     loadData();
-  }, [date, user, roles.length, isAdmin]);
+  }, [date, user?.email, isAdmin]);
 
   async function loginWithGoogle() {
     await supabase.auth.signInWithOAuth({
@@ -273,7 +289,7 @@ export default function Home() {
         booking.room_id === roomId &&
         booking.booking_date === date &&
         overlaps(booking.start_time, booking.end_time, cellTime, end) &&
-        !isPastTime(date, cleanTime(booking.end_time))
+        !bookingHasEnded(booking)
     );
   }
 
@@ -283,7 +299,7 @@ export default function Home() {
         booking.room_id === roomId &&
         booking.booking_date === date &&
         overlaps(booking.start_time, booking.end_time, start, end) &&
-        !isPastTime(date, cleanTime(booking.end_time))
+        !bookingHasEnded(booking)
     );
   }
 
@@ -332,6 +348,7 @@ export default function Home() {
 
     const usedMinutes =
       dailyBookings?.reduce((total, booking) => {
+        if (bookingHasEnded(booking)) return total;
         return total + minutesBetween(booking.start_time, booking.end_time);
       }, 0) || 0;
 
@@ -357,6 +374,7 @@ export default function Home() {
 
     const usedMinutes =
       weeklyBookings?.reduce((total, booking) => {
+        if (bookingHasEnded(booking)) return total;
         return total + minutesBetween(booking.start_time, booking.end_time);
       }, 0) || 0;
 
@@ -376,6 +394,11 @@ export default function Home() {
 
     const suspended = await checkSuspension();
     if (suspended) return;
+
+    if (isPastDate(date)) {
+      alert("You cannot book a past date.");
+      return;
+    }
 
     if (isWeekend(date)) {
       alert("Weekend bookings are not allowed.");
@@ -404,6 +427,13 @@ export default function Home() {
     const start = selection.start;
     const end = cellEnd(time);
     const duration = minutesBetween(start, end);
+
+    if (isPastTime(date, start) || isPastTime(date, end)) {
+      alert("You cannot book a past time.");
+      setSelection(null);
+      setHoverTime(null);
+      return;
+    }
 
     if (duration < 30) {
       alert("Minimum booking time is 30 minutes.");
@@ -650,6 +680,11 @@ export default function Home() {
   }
 
   function handleDateChange(newDate: string) {
+    if (isPastDate(newDate)) {
+      alert("You cannot book a past date.");
+      return;
+    }
+
     if (isWeekend(newDate)) {
       alert("Weekend bookings are not allowed.");
       return;
@@ -659,6 +694,9 @@ export default function Home() {
     setHoverTime(null);
     setDate(newDate);
   }
+
+  const visibleMyBookings = myBookings.filter((booking) => !bookingHasEnded(booking));
+  const visibleAdminBookings = adminBookings.filter((booking) => !bookingHasEnded(booking));
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
@@ -756,6 +794,7 @@ export default function Home() {
             <input
               type="date"
               value={date}
+              min={localToday()}
               onChange={(e) => handleDateChange(e.target.value)}
               className="border rounded-lg px-4 py-2 ml-auto"
             />
@@ -792,7 +831,7 @@ export default function Home() {
                       return (
                         <td key={time} className="border-b p-0">
                           <button
-                            disabled={booked || past}
+                            disabled={booked || past || isPastDate(date)}
                             onMouseEnter={() => {
                               if (selection?.room.id === room.id) {
                                 setHoverTime(time);
@@ -802,7 +841,7 @@ export default function Home() {
                             className={
                               booked
                                 ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 rounded-none"
-                                : past
+                                : past || isPastDate(date)
                                 ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 rounded-none"
                                 : preview
                                 ? "bg-gray-200 hover:bg-gray-200 w-full h-8 border border-gray-300 rounded-none"
@@ -825,12 +864,12 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-lg border p-6">
             <h2 className="text-3xl font-bold mb-6">My Bookings</h2>
 
-            {myBookings.length === 0 && (
-              <p className="text-gray-600">You do not have any bookings yet.</p>
+            {visibleMyBookings.length === 0 && (
+              <p className="text-gray-600">You do not have any active bookings.</p>
             )}
 
             <div className="space-y-4">
-              {myBookings.map((booking) => (
+              {visibleMyBookings.map((booking) => (
                 <div
                   key={booking.id}
                   className="border rounded-xl p-4 flex items-center justify-between"
@@ -860,14 +899,14 @@ export default function Home() {
 
         {view === "admin" && isAdmin && (
           <div className="bg-white rounded-2xl shadow-lg border p-6">
-            <h2 className="text-3xl font-bold mb-6">Admin: All Bookings</h2>
+            <h2 className="text-3xl font-bold mb-6">Admin: Active Bookings</h2>
 
-            {adminBookings.length === 0 && (
-              <p className="text-gray-600">No bookings yet.</p>
+            {visibleAdminBookings.length === 0 && (
+              <p className="text-gray-600">No active bookings.</p>
             )}
 
             <div className="space-y-4">
-              {adminBookings.map((booking) => (
+              {visibleAdminBookings.map((booking) => (
                 <div
                   key={booking.id}
                   className="border rounded-xl p-4 flex items-center justify-between"
