@@ -470,12 +470,6 @@ export default function ClassroomsPage() {
             Continue with TC/CU Google
           </button>
 
-<button
-  onClick={() => (window.location.href = "/equipment")}
-  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
->
-  Equipment
-</button>
 
 
           <button
@@ -642,6 +636,13 @@ export default function ClassroomsPage() {
             >
               Book Classroom
             </button>
+<button
+  onClick={() => (window.location.href = "/equipment")}
+  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+>
+  Equipment
+</button>
+
 
             <button
               onClick={() => setView("myBookings")}
