@@ -105,7 +105,13 @@ function bookingEnded(booking: Booking) {
 
 export default function ClassroomPage() {
   const [user, setUser] = useState<User | null>(null);
-  const [classrooms, setClassrooms] = useState<Classroom[]>([]);
+  const [classrooms, setClassrooms] = useState<Classroom[]>([
+  { id: "435", room_number: "435" },
+  { id: "519", room_number: "519" },
+  { id: "522", room_number: "522" },
+  { id: "524", room_number: "524" },
+  { id: "526", room_number: "526" },
+]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [date, setDate] = useState(localToday());
@@ -133,7 +139,6 @@ export default function ClassroomPage() {
       .select("*")
       .order("room_number");
 
-    setClassrooms(roomData || []);
 
     const { data: bookingData } = await supabase
       .from("classroom_bookings")
