@@ -902,7 +902,7 @@ export default function Home() {
                           </div>
                         )}
 
-                        {room.room_number === "515K" && (
+                        {room.room_number === "515F" && (
                           <div className="text-xs text-red-500 mt-1">
                             Instructor/Admin only
                           </div>
