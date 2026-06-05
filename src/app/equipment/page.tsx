@@ -50,7 +50,9 @@ export default function EquipmentPage() {
   const [search, setSearch] = useState("");
 
   const currentRole = user?.email
-    ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
+    ? roles.find(
+        (r) => r.email.toLowerCase() === user.email?.toLowerCase()
+      )?.role
     : undefined;
 
   const isBackupAdmin = user?.email
@@ -63,18 +65,25 @@ export default function EquipmentPage() {
     const { data: roleData } = await supabase.from("user_roles").select("*");
     setRoles(roleData || []);
 
-    const { data: itemData } = await supabase
+    const { data: itemData, error: itemError } = await supabase
       .from("equipment_items")
       .select("*")
-      .order("category", { ascending: true })
-      .order("inventory_code", { ascending: true });
+      .order("category", { ascending: true });
+
+    if (itemError) {
+      alert("Equipment load error: " + itemError.message);
+    }
 
     setItems(itemData || []);
 
-    const { data: checkoutData } = await supabase
+    const { data: checkoutData, error: checkoutError } = await supabase
       .from("equipment_checkouts")
       .select("*")
       .order("checkout_date", { ascending: false });
+
+    if (checkoutError) {
+      alert("Checkout load error: " + checkoutError.message);
+    }
 
     setCheckouts(checkoutData || []);
   }
@@ -84,9 +93,11 @@ export default function EquipmentPage() {
       setUser(data.user);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user || null);
+      }
+    );
 
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -109,12 +120,18 @@ export default function EquipmentPage() {
     setUser(null);
   }
 
-  function matchesSearch(value: any) {
-    return String(value || "").toLowerCase().includes(search.toLowerCase());
+  function matchSearch(values: Array<string | null>) {
+    if (!search.trim()) return true;
+
+    const query = search.toLowerCase();
+
+    return values.some((value) =>
+      String(value || "").toLowerCase().includes(query)
+    );
   }
 
-  const filteredItems = items.filter((item) =>
-    [
+  const shownItems = items.filter((item) =>
+    matchSearch([
       item.inventory_code,
       item.category,
       item.item_name,
@@ -124,11 +141,11 @@ export default function EquipmentPage() {
       item.location,
       item.status,
       item.notes,
-    ].some(matchesSearch)
+    ])
   );
 
-  const filteredCheckouts = checkouts.filter((checkout) =>
-    [
+  const shownCheckouts = checkouts.filter((checkout) =>
+    matchSearch([
       checkout.equipment_code,
       checkout.renter_name,
       checkout.uni,
@@ -137,8 +154,43 @@ export default function EquipmentPage() {
       checkout.checkout_date,
       checkout.return_date,
       checkout.notes,
-    ].some(matchesSearch)
+    ])
   );
+
+  async function addItem() {
+    if (!isAdmin) return;
+
+    const inventory_code = prompt("Inventory Code:");
+    if (!inventory_code) return;
+
+    const category = prompt("Category:") || "";
+    const item_name = prompt("Item Name:") || "";
+    const manufacturer = prompt("Manufacturer:") || "";
+    const model = prompt("Model:") || "";
+    const serial_number = prompt("Serial Number:") || "";
+    const location = prompt("Location:") || "";
+    const status = prompt("Status:") || "Available";
+    const notes = prompt("Notes:") || "";
+
+    const { error } = await supabase.from("equipment_items").insert({
+      inventory_code,
+      category,
+      item_name,
+      manufacturer,
+      model,
+      serial_number,
+      location,
+      status,
+      notes,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadData();
+  }
 
   async function editItem(item: EquipmentItem) {
     if (!isAdmin) return;
@@ -191,33 +243,49 @@ export default function EquipmentPage() {
     }
 
     await loadData();
-    alert("Inventory item updated.");
   }
 
-  async function addItem() {
+  async function deleteItem(id: string) {
     if (!isAdmin) return;
 
-    const inventory_code = prompt("Inventory Code:");
-    if (!inventory_code) return;
+    const confirmed = confirm("Delete this inventory item?");
+    if (!confirmed) return;
 
-    const category = prompt("Category:") || "";
-    const item_name = prompt("Item Name:") || "";
-    const manufacturer = prompt("Manufacturer:") || "";
-    const model = prompt("Model:") || "";
-    const serial_number = prompt("Serial Number:") || "";
-    const location = prompt("Location:") || "";
-    const status = prompt("Status:") || "Available";
+    const { error } = await supabase
+      .from("equipment_items")
+      .delete()
+      .eq("id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadData();
+  }
+
+  async function addCheckout() {
+    if (!isAdmin) return;
+
+    const equipment_code = prompt("Equipment Code:");
+    if (!equipment_code) return;
+
+    const renter_name = prompt("Renter Name:") || "";
+    const uni = prompt("UNI:") || "";
+    const email = prompt("Email:") || "";
+    const instructor = prompt("Instructor:") || "";
+    const checkout_date = prompt("Checkout Date:") || "";
+    const return_date = prompt("Return Date:") || "";
     const notes = prompt("Notes:") || "";
 
-    const { error } = await supabase.from("equipment_items").insert({
-      inventory_code,
-      category,
-      item_name,
-      manufacturer,
-      model,
-      serial_number,
-      location,
-      status,
+    const { error } = await supabase.from("equipment_checkouts").insert({
+      equipment_code,
+      renter_name,
+      uni,
+      email,
+      instructor,
+      checkout_date,
+      return_date,
       notes,
     });
 
@@ -227,30 +295,15 @@ export default function EquipmentPage() {
     }
 
     await loadData();
-    alert("Inventory item added.");
-  }
-
-  async function deleteItem(id: string) {
-    if (!isAdmin) return;
-
-    const confirmed = confirm("Delete this inventory item?");
-    if (!confirmed) return;
-
-    const { error } = await supabase.from("equipment_items").delete().eq("id", id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    await loadData();
-    alert("Inventory item deleted.");
   }
 
   async function editCheckout(checkout: Checkout) {
     if (!isAdmin) return;
 
-    const equipment_code = prompt("Equipment Code:", checkout.equipment_code || "");
+    const equipment_code = prompt(
+      "Equipment Code:",
+      checkout.equipment_code || ""
+    );
     if (equipment_code === null) return;
 
     const renter_name = prompt("Renter Name:", checkout.renter_name || "");
@@ -294,41 +347,6 @@ export default function EquipmentPage() {
     }
 
     await loadData();
-    alert("Checkout record updated.");
-  }
-
-  async function addCheckout() {
-    if (!isAdmin) return;
-
-    const equipment_code = prompt("Equipment Code:");
-    if (!equipment_code) return;
-
-    const renter_name = prompt("Renter Name:") || "";
-    const uni = prompt("UNI:") || "";
-    const email = prompt("Email:") || "";
-    const instructor = prompt("Instructor:") || "";
-    const checkout_date = prompt("Checkout Date:") || "";
-    const return_date = prompt("Return Date:") || "";
-    const notes = prompt("Notes:") || "";
-
-    const { error } = await supabase.from("equipment_checkouts").insert({
-      equipment_code,
-      renter_name,
-      uni,
-      email,
-      instructor,
-      checkout_date,
-      return_date,
-      notes,
-    });
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    await loadData();
-    alert("Checkout record added.");
   }
 
   async function deleteCheckout(id: string) {
@@ -337,7 +355,10 @@ export default function EquipmentPage() {
     const confirmed = confirm("Delete this checkout record?");
     if (!confirmed) return;
 
-    const { error } = await supabase.from("equipment_checkouts").delete().eq("id", id);
+    const { error } = await supabase
+      .from("equipment_checkouts")
+      .delete()
+      .eq("id", id);
 
     if (error) {
       alert(error.message);
@@ -345,7 +366,6 @@ export default function EquipmentPage() {
     }
 
     await loadData();
-    alert("Checkout record deleted.");
   }
 
   if (!user) {
@@ -382,7 +402,8 @@ export default function EquipmentPage() {
           </h1>
 
           <p className="text-gray-600 mt-2">
-            View inventory. Admins can edit inventory and checkout records.
+            Inventory: {items.length} items · Checkout records:{" "}
+            {checkouts.length}
           </p>
         </div>
 
@@ -446,7 +467,7 @@ export default function EquipmentPage() {
           </button>
 
           <input
-            placeholder="Search inventory..."
+            placeholder="Search..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="border rounded-lg px-4 py-2 ml-auto"
@@ -472,7 +493,7 @@ export default function EquipmentPage() {
               </thead>
 
               <tbody>
-                {filteredItems.map((item) => (
+                {shownItems.map((item) => (
                   <tr key={item.id}>
                     <td className="p-3 border">{item.inventory_code}</td>
                     <td className="p-3 border">{item.category}</td>
@@ -528,7 +549,7 @@ export default function EquipmentPage() {
               </thead>
 
               <tbody>
-                {filteredCheckouts.map((checkout) => (
+                {shownCheckouts.map((checkout) => (
                   <tr key={checkout.id}>
                     <td className="p-3 border">{checkout.equipment_code}</td>
                     <td className="p-3 border">{checkout.renter_name}</td>
