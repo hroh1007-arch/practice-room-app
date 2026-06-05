@@ -374,6 +374,14 @@ export default function Home() {
       alert("Please log in first.");
       return;
     }
+    if (
+       room.room_number === "515K" &&
+       !isAdmin &&
+       !isInstructor
+) {
+  alert("515K is only available to instructors and admins.");
+  return;
+}
 
     const suspended = await checkSuspension();
     if (suspended) return;
