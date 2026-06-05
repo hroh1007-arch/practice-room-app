@@ -404,8 +404,8 @@ export default function Home() {
       return;
     }
 
-    if (room.room_number === "515K" && !hasUnlimitedBooking) {
-      alert("515K is only available to instructors/admins.");
+    if (room.room_number === "515F" && !hasUnlimitedBooking) {
+      alert("515F is only available to instructors/admins.");
       return;
     }
 
