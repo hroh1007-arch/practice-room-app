@@ -471,7 +471,7 @@ export default function ClassroomsPage() {
           </button>
 
           <button
-            onClick={() => (window.location.href = "/")}
+            onClick={() => (window.location.href = "/practice")}
             className="border px-5 py-3 rounded-lg hover:bg-gray-100 w-full mt-3"
           >
             Back to Practice Rooms
@@ -491,7 +491,7 @@ export default function ClassroomsPage() {
           </p>
 
           <button
-            onClick={() => (window.location.href = "/")}
+            onClick={() => (window.location.href = "/practice")}
             className="border px-5 py-3 rounded-lg hover:bg-gray-100 w-full"
           >
             Back to Practice Rooms
@@ -622,7 +622,7 @@ export default function ClassroomsPage() {
 
           <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border flex gap-4 items-center flex-wrap">
             <button
-              onClick={() => (window.location.href = "/")}
+              onClick={() => (window.location.href = "/practice")}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Practice Rooms
