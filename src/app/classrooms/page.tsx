@@ -470,6 +470,14 @@ export default function ClassroomsPage() {
             Continue with TC/CU Google
           </button>
 
+<button
+  onClick={() => (window.location.href = "/equipment")}
+  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+>
+  Equipment
+</button>
+
+
           <button
             onClick={() => (window.location.href = "/practice")}
             className="border px-5 py-3 rounded-lg hover:bg-gray-100 w-full mt-3"
