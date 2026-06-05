@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 type Room = {
   id: string;
   room_number: string;
+  description?: string | null;
 };
 
 type Booking = {
@@ -16,12 +17,10 @@ type Booking = {
   start_time: string;
   end_time: string;
   user_email: string;
-  checked_in?: boolean;
-  checked_in_at?: string | null;
+  remark?: string | null;
 };
 
 type UserRole = {
-  id: string;
   email: string;
   role: "admin" | "instructor";
 };
@@ -55,76 +54,75 @@ const backupAdminEmails = [
   "ma3412@tc.columbia.edu",
 ];
 
+function localToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(now.getDate()).padStart(2, "0")}`;
+}
+
 function cleanTime(time: string) {
   return time.slice(0, 5);
 }
 
-function localToday() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 function timeToMinutes(time: string) {
-  const [hour, minute] = cleanTime(time).split(":").map(Number);
-  return hour * 60 + minute;
+  const [h, m] = cleanTime(time).split(":").map(Number);
+  return h * 60 + m;
 }
 
 function minutesToTime(total: number) {
-  const hour = Math.floor(total / 60);
-  const minute = total % 60;
-  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+  return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(
+    total % 60
+  ).padStart(2, "0")}`;
 }
 
-function cellEnd(cellTime: string) {
-  return minutesToTime(timeToMinutes(cellTime) + 30);
+function cellEnd(time: string) {
+  return minutesToTime(timeToMinutes(time) + 30);
 }
 
 function minutesBetween(start: string, end: string) {
   return timeToMinutes(end) - timeToMinutes(start);
 }
 
-function overlaps(existingStart: string, existingEnd: string, newStart: string, newEnd: string) {
+function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return (
-    timeToMinutes(existingStart) < timeToMinutes(newEnd) &&
-    timeToMinutes(existingEnd) > timeToMinutes(newStart)
+    timeToMinutes(aStart) < timeToMinutes(bEnd) &&
+    timeToMinutes(aEnd) > timeToMinutes(bStart)
   );
 }
 
-function isWeekend(selectedDate: string) {
-  const selectedDateObj = new Date(selectedDate + "T00:00:00");
-  const day = selectedDateObj.getDay();
+function isWeekend(date: string) {
+  const day = new Date(date + "T00:00:00").getDay();
   return day === 0 || day === 6;
 }
 
-function isPastDate(selectedDate: string) {
-  return selectedDate < localToday();
+function isPastDate(date: string) {
+  return date < localToday();
 }
 
-function isPastTime(selectedDate: string, time: string) {
+function isPastTime(date: string, time: string) {
   const today = localToday();
 
-  if (selectedDate < today) return true;
-  if (selectedDate > today) return false;
+  if (date < today) return true;
+  if (date > today) return false;
 
   const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const current = now.getHours() * 60 + now.getMinutes();
 
-  return timeToMinutes(time) < currentMinutes;
+  return timeToMinutes(time) < current;
 }
 
-function bookingHasEnded(booking: Booking) {
+function bookingEnded(booking: Booking) {
   const today = localToday();
 
   if (booking.booking_date < today) return true;
   if (booking.booking_date > today) return false;
 
   const now = new Date();
-  const currentMinutes = now.getHours() * 60 + now.getMinutes();
+  const current = now.getHours() * 60 + now.getMinutes();
 
-  return timeToMinutes(booking.end_time) <= currentMinutes;
+  return timeToMinutes(booking.end_time) <= current;
 }
 
 function getWeekRange(selectedDate: string) {
@@ -146,6 +144,7 @@ function getWeekRange(selectedDate: string) {
 
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
+
   const [rooms, setRooms] = useState<Room[]>([]);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
@@ -153,16 +152,19 @@ export default function Home() {
   const [roles, setRoles] = useState<UserRole[]>([]);
 
   const [newRoleEmail, setNewRoleEmail] = useState("");
-  const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
+  const [newRoleType, setNewRoleType] =
+    useState<"admin" | "instructor">("instructor");
 
   const [date, setDate] = useState(localToday());
-  const [view, setView] = useState<"booking" | "myBookings" | "admin" | "roles">("booking");
+  const [view, setView] =
+    useState<"booking" | "myBookings" | "admin" | "roles">("booking");
 
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
 
   const currentRole = user?.email
-    ? roles.find((role) => role.email.toLowerCase() === user.email?.toLowerCase())?.role
+    ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())
+        ?.role
     : undefined;
 
   const isBackupAdmin = user?.email
@@ -173,29 +175,23 @@ export default function Home() {
   const isInstructor = currentRole === "instructor";
   const hasUnlimitedBooking = isAdmin || isInstructor;
 
-  async function loadRoles() {
-    const { data, error } = await supabase
-      .from("user_roles")
-      .select("*")
-      .order("role", { ascending: true })
-      .order("email", { ascending: true });
-
-    if (!error) setRoles((data || []) as UserRole[]);
-  }
-
   async function loadData() {
-    const { data: roomsData } = await supabase
+    const { data: roleData } = await supabase.from("user_roles").select("*");
+    setRoles(roleData || []);
+
+    const { data: roomData } = await supabase
       .from("practice_rooms")
       .select("*")
       .order("room_number");
 
-    const { data: bookingsData } = await supabase
+    setRooms(roomData || []);
+
+    const { data: bookingData } = await supabase
       .from("bookings")
       .select("*")
       .eq("booking_date", date);
 
-    setRooms(roomsData || []);
-    setBookings(bookingsData || []);
+    setBookings((bookingData || []).filter((b) => !bookingEnded(b)));
 
     if (user?.email) {
       const { data: mine } = await supabase
@@ -205,7 +201,7 @@ export default function Home() {
         .order("booking_date", { ascending: true })
         .order("start_time", { ascending: true });
 
-      setMyBookings((mine || []).filter((booking) => !bookingHasEnded(booking)));
+      setMyBookings((mine || []).filter((b) => !bookingEnded(b)));
     }
 
     if (isAdmin) {
@@ -215,7 +211,7 @@ export default function Home() {
         .order("booking_date", { ascending: true })
         .order("start_time", { ascending: true });
 
-      setAdminBookings((all || []).filter((booking) => !bookingHasEnded(booking)));
+      setAdminBookings((all || []).filter((b) => !bookingEnded(b)));
     }
   }
 
@@ -234,8 +230,6 @@ export default function Home() {
   }
 
   useEffect(() => {
-    loadRoles();
-
     supabase.auth.getUser().then(({ data }) => {
       checkUser(data.user);
     });
@@ -243,13 +237,10 @@ export default function Home() {
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, session) => {
         checkUser(session?.user || null);
-        loadRoles();
       }
     );
 
-    return () => {
-      listener.subscription.unsubscribe();
-    };
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -279,44 +270,36 @@ export default function Home() {
     return rooms.find((room) => room.id === roomId)?.room_number || "Room";
   }
 
-  function isCellBooked(roomId: string, cellTime: string) {
-    const end = cellEnd(cellTime);
-
-    if (isPastTime(date, end)) return false;
+  function isBooked(roomId: string, time: string) {
+    const end = cellEnd(time);
 
     return bookings.some(
-      (booking) =>
-        booking.room_id === roomId &&
-        booking.booking_date === date &&
-        overlaps(booking.start_time, booking.end_time, cellTime, end) &&
-        !bookingHasEnded(booking)
+      (b) =>
+        b.room_id === roomId &&
+        overlaps(b.start_time, b.end_time, time, end) &&
+        !bookingEnded(b)
     );
   }
 
   function hasConflict(roomId: string, start: string, end: string) {
     return bookings.some(
-      (booking) =>
-        booking.room_id === roomId &&
-        booking.booking_date === date &&
-        overlaps(booking.start_time, booking.end_time, start, end) &&
-        !bookingHasEnded(booking)
+      (b) =>
+        b.room_id === roomId &&
+        overlaps(b.start_time, b.end_time, start, end) &&
+        !bookingEnded(b)
     );
   }
 
-  function isPreviewCell(roomId: string, cellTime: string) {
+  function isPreview(roomId: string, time: string) {
     if (!selection || !hoverTime) return false;
     if (selection.room.id !== roomId) return false;
 
-    const start = selection.start;
-    const previewEnd = cellEnd(hoverTime);
-    const duration = minutesBetween(start, previewEnd);
+    const end = cellEnd(hoverTime);
 
-    if (timeToMinutes(cellTime) < timeToMinutes(start)) return false;
-    if (timeToMinutes(cellTime) >= timeToMinutes(previewEnd)) return false;
-    if (duration < 30) return false;
-    if (!hasUnlimitedBooking && duration > 120) return false;
-
-    return true;
+    return (
+      timeToMinutes(time) >= timeToMinutes(selection.start) &&
+      timeToMinutes(time) < timeToMinutes(end)
+    );
   }
 
   async function checkSuspension() {
@@ -348,7 +331,7 @@ export default function Home() {
 
     const usedMinutes =
       dailyBookings?.reduce((total, booking) => {
-        if (bookingHasEnded(booking)) return total;
+        if (bookingEnded(booking)) return total;
         return total + minutesBetween(booking.start_time, booking.end_time);
       }, 0) || 0;
 
@@ -374,7 +357,7 @@ export default function Home() {
 
     const usedMinutes =
       weeklyBookings?.reduce((total, booking) => {
-        if (bookingHasEnded(booking)) return total;
+        if (bookingEnded(booking)) return total;
         return total + minutesBetween(booking.start_time, booking.end_time);
       }, 0) || 0;
 
@@ -388,7 +371,7 @@ export default function Home() {
 
   async function handleCellClick(room: Room, time: string) {
     if (!user) {
-      alert("Please log in with your TC or Columbia Google account before booking.");
+      alert("Please log in first.");
       return;
     }
 
@@ -396,7 +379,7 @@ export default function Home() {
     if (suspended) return;
 
     if (isPastDate(date)) {
-      alert("You cannot book a past date.");
+      alert("Cannot book past dates.");
       return;
     }
 
@@ -406,11 +389,11 @@ export default function Home() {
     }
 
     if (isPastTime(date, time)) {
-      alert("You cannot book a past time.");
+      alert("Cannot book past times.");
       return;
     }
 
-    if (isCellBooked(room.id, time)) return;
+    if (isBooked(room.id, time)) return;
 
     if (!selection || selection.room.id !== room.id) {
       setSelection({ room, start: time });
@@ -429,7 +412,7 @@ export default function Home() {
     const duration = minutesBetween(start, end);
 
     if (isPastTime(date, start) || isPastTime(date, end)) {
-      alert("You cannot book a past time.");
+      alert("Cannot book past times.");
       setSelection(null);
       setHoverTime(null);
       return;
@@ -443,17 +426,17 @@ export default function Home() {
     }
 
     if (!hasUnlimitedBooking && duration > 120) {
-      alert("One booking can only be up to 2 hours.");
+      alert("Students can only book up to 2 hours at once.");
       setSelection(null);
       setHoverTime(null);
       return;
     }
 
     if (hasConflict(room.id, start, end)) {
-      alert("This booking overlaps with an existing reservation.");
-      await loadData();
+      alert("This room is already booked.");
       setSelection(null);
       setHoverTime(null);
+      await loadData();
       return;
     }
 
@@ -473,49 +456,29 @@ export default function Home() {
       }
     }
 
+    const remark =
+      window.prompt("Optional note/remark for this booking:", "") || "";
+
     const confirmed = window.confirm(
-      `Confirm booking for ${room.room_number} from ${start} to ${end}?`
+      `Book ${room.room_number} from ${start} to ${end}?`
     );
 
-    if (!confirmed) {
-      setSelection(null);
-      setHoverTime(null);
-      return;
-    }
-
-    const optimisticBooking: Booking = {
-      id: crypto.randomUUID(),
-      room_id: room.id,
-      booking_date: date,
-      start_time: start,
-      end_time: end,
-      user_email: user.email || "",
-      checked_in: hasUnlimitedBooking,
-      checked_in_at: hasUnlimitedBooking ? new Date().toISOString() : null,
-    };
-
-    setBookings((prev) => [...prev, optimisticBooking]);
+    if (!confirmed) return;
 
     const { error } = await supabase.from("bookings").insert({
       room_id: room.id,
-      user_id: user.id,
-      user_email: user.email,
       booking_date: date,
       start_time: start,
       end_time: end,
+      user_email: user.email,
+      user_id: user.id,
+      remark,
       checked_in: hasUnlimitedBooking,
       checked_in_at: hasUnlimitedBooking ? new Date().toISOString() : null,
     });
 
     if (error) {
-      setBookings((prev) =>
-        prev.filter((booking) => booking.id !== optimisticBooking.id)
-      );
-
-      alert("This room is already booked during that time.");
-      await loadData();
-      setSelection(null);
-      setHoverTime(null);
+      alert(error.message);
       return;
     }
 
@@ -538,82 +501,68 @@ export default function Home() {
     setHoverTime(null);
     await loadData();
 
-    alert(
-      hasUnlimitedBooking
-        ? "Booking confirmed. Instructor/admin bookings do not require check-in."
-        : "Booking confirmed."
-    );
+    alert("Booked.");
   }
 
-  async function cancelBooking(bookingId: string) {
+  async function cancelBooking(id: string, ownerEmail?: string) {
+    if (!isAdmin && ownerEmail && ownerEmail !== user?.email) {
+      alert("You can only cancel your own booking.");
+      return;
+    }
+
     const confirmed = window.confirm("Cancel this booking?");
     if (!confirmed) return;
 
-    const cancelledBooking = myBookings.find((b) => b.id === bookingId);
+    const booking = [...myBookings, ...adminBookings].find((b) => b.id === id);
 
-    const { error } = await supabase
-      .from("bookings")
-      .delete()
-      .eq("id", bookingId)
-      .eq("user_email", user?.email);
+    const { error } = await supabase.from("bookings").delete().eq("id", id);
 
     if (error) {
       alert(error.message);
-    } else {
-      if (cancelledBooking) {
-        await fetch("/api/send-booking-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "cancel",
-            email: user?.email,
-            room: roomName(cancelledBooking.room_id),
-            date: cancelledBooking.booking_date,
-            startTime: cleanTime(cancelledBooking.start_time),
-            endTime: cleanTime(cancelledBooking.end_time),
-          }),
-        });
-      }
-
-      alert("Booking cancelled.");
-      await loadData();
+      return;
     }
+
+    if (booking) {
+      await fetch("/api/send-booking-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "cancel",
+          email: booking.user_email,
+          room: roomName(booking.room_id),
+          date: booking.booking_date,
+          startTime: cleanTime(booking.start_time),
+          endTime: cleanTime(booking.end_time),
+        }),
+      });
+    }
+
+    await loadData();
+    alert("Cancelled.");
   }
 
-  async function adminCancelBooking(bookingId: string) {
+  async function updateRoomDescription(room: Room) {
     if (!isAdmin) return;
 
-    const confirmed = window.confirm("Admin cancel this booking?");
-    if (!confirmed) return;
+    const description = window.prompt(
+      `Description for ${room.room_number}:`,
+      room.description || ""
+    );
 
-    const cancelledBooking = adminBookings.find((b) => b.id === bookingId);
+    if (description === null) return;
 
     const { error } = await supabase
-      .from("bookings")
-      .delete()
-      .eq("id", bookingId);
+      .from("practice_rooms")
+      .update({ description })
+      .eq("id", room.id);
 
     if (error) {
       alert(error.message);
-    } else {
-      if (cancelledBooking) {
-        await fetch("/api/send-booking-email", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "cancel",
-            email: cancelledBooking.user_email,
-            room: roomName(cancelledBooking.room_id),
-            date: cancelledBooking.booking_date,
-            startTime: cleanTime(cancelledBooking.start_time),
-            endTime: cleanTime(cancelledBooking.end_time),
-          }),
-        });
-      }
-
-      alert("Booking cancelled by admin.");
-      await loadData();
+      return;
     }
+
+    await loadData();
+    alert("Description updated.");
   }
 
   async function addRole() {
@@ -645,7 +594,7 @@ export default function Home() {
     }
 
     setNewRoleEmail("");
-    await loadRoles();
+    await loadData();
     alert("User role added or updated.");
   }
 
@@ -672,10 +621,7 @@ export default function Home() {
       return;
     }
 
-    setRoles((prev) =>
-      prev.filter((role) => role.email.toLowerCase() !== normalizedEmail)
-    );
-
+    await loadData();
     alert("Role removed.");
   }
 
@@ -694,9 +640,6 @@ export default function Home() {
     setHoverTime(null);
     setDate(newDate);
   }
-
-  const visibleMyBookings = myBookings.filter((booking) => !bookingHasEnded(booking));
-  const visibleAdminBookings = adminBookings.filter((booking) => !bookingHasEnded(booking));
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
@@ -743,6 +686,15 @@ export default function Home() {
               >
                 My Bookings
               </button>
+
+              {hasUnlimitedBooking && (
+                <button
+                  onClick={() => (window.location.href = "/classrooms")}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  Classrooms
+                </button>
+              )}
 
               {isAdmin && (
                 <>
@@ -819,13 +771,28 @@ export default function Home() {
               <tbody>
                 {rooms.map((room) => (
                   <tr key={room.id}>
-                    <td className="p-4 border-b font-semibold bg-gray-50">
-                      {room.room_number}
+                    <td className="p-4 border-b font-semibold bg-gray-50 text-left">
+                      <div>{room.room_number}</div>
+
+                      {room.description && (
+                        <div className="text-xs text-gray-500 mt-1">
+                          {room.description}
+                        </div>
+                      )}
+
+                      {isAdmin && (
+                        <button
+                          onClick={() => updateRoomDescription(room)}
+                          className="text-xs text-blue-600 underline mt-1"
+                        >
+                          Edit description
+                        </button>
+                      )}
                     </td>
 
                     {times.map((time) => {
-                      const booked = isCellBooked(room.id, time);
-                      const preview = isPreviewCell(room.id, time);
+                      const booked = isBooked(room.id, time);
+                      const preview = isPreview(room.id, time);
                       const past = isPastTime(date, time);
 
                       return (
@@ -840,12 +807,12 @@ export default function Home() {
                             onClick={() => handleCellClick(room, time)}
                             className={
                               booked
-                                ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 rounded-none"
+                                ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300"
                                 : past || isPastDate(date)
-                                ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 rounded-none"
+                                ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200"
                                 : preview
-                                ? "bg-gray-200 hover:bg-gray-200 w-full h-8 border border-gray-300 rounded-none"
-                                : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 rounded-none"
+                                ? "bg-gray-200 w-full h-8 border border-gray-300"
+                                : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300"
                             }
                           >
                             {booked ? "Booked" : ""}
@@ -864,12 +831,12 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-lg border p-6">
             <h2 className="text-3xl font-bold mb-6">My Bookings</h2>
 
-            {visibleMyBookings.length === 0 && (
-              <p className="text-gray-600">You do not have any active bookings.</p>
+            {myBookings.length === 0 && (
+              <p className="text-gray-600">No active bookings.</p>
             )}
 
             <div className="space-y-4">
-              {visibleMyBookings.map((booking) => (
+              {myBookings.map((booking) => (
                 <div
                   key={booking.id}
                   className="border rounded-xl p-4 flex items-center justify-between"
@@ -883,10 +850,16 @@ export default function Home() {
                       {booking.booking_date} · {cleanTime(booking.start_time)}–
                       {cleanTime(booking.end_time)}
                     </p>
+
+                    {booking.remark && (
+                      <p className="text-gray-500 text-sm">
+                        Remark: {booking.remark}
+                      </p>
+                    )}
                   </div>
 
                   <button
-                    onClick={() => cancelBooking(booking.id)}
+                    onClick={() => cancelBooking(booking.id, booking.user_email)}
                     className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
                   >
                     Cancel
@@ -901,12 +874,12 @@ export default function Home() {
           <div className="bg-white rounded-2xl shadow-lg border p-6">
             <h2 className="text-3xl font-bold mb-6">Admin: Active Bookings</h2>
 
-            {visibleAdminBookings.length === 0 && (
+            {adminBookings.length === 0 && (
               <p className="text-gray-600">No active bookings.</p>
             )}
 
             <div className="space-y-4">
-              {visibleAdminBookings.map((booking) => (
+              {adminBookings.map((booking) => (
                 <div
                   key={booking.id}
                   className="border rounded-xl p-4 flex items-center justify-between"
@@ -924,10 +897,16 @@ export default function Home() {
                     <p className="text-gray-500 text-sm">
                       {booking.user_email}
                     </p>
+
+                    {booking.remark && (
+                      <p className="text-gray-500 text-sm">
+                        Remark: {booking.remark}
+                      </p>
+                    )}
                   </div>
 
                   <button
-                    onClick={() => adminCancelBooking(booking.id)}
+                    onClick={() => cancelBooking(booking.id, booking.user_email)}
                     className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
                   >
                     Cancel
@@ -1002,4 +981,3 @@ export default function Home() {
     </main>
   );
 }
-
