@@ -492,7 +492,7 @@ export default function EquipmentPage() {
           <button onClick={login} className="bg-black text-white px-5 py-3 rounded-lg hover:bg-gray-800 w-full">
             Continue with TC/CU Google
           </button>
-          <button onClick={() => (window.location.href = "/")} className="border px-5 py-3 rounded-lg hover:bg-gray-100 w-full mt-3">
+          <button onClick={() => (window.location.href = "/practice")} className="border px-5 py-3 rounded-lg hover:bg-gray-100 w-full mt-3">
             Back to Practice Rooms
           </button>
         </div>
@@ -600,7 +600,7 @@ export default function EquipmentPage() {
           </div>
 
           <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border flex gap-4 items-center flex-wrap">
-            <button onClick={() => (window.location.href = "/")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Practice Rooms</button>
+            <button onClick={() => (window.location.href = "/practice")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Practice Rooms</button>
             <button onClick={() => (window.location.href = "/classrooms")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Classrooms</button>
             <button onClick={() => setView("inventory")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Inventory</button>
             <button onClick={() => setView("active")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Active Renting</button>
