@@ -697,6 +697,52 @@ export default function Home() {
 
               {hasUnlimitedBooking && (
                 <button
+  onClick={() => {
+    const room = prompt("Room number?");
+    const startDate = prompt("Start date (YYYY-MM-DD)?");
+    const endDate = prompt("End date (YYYY-MM-DD)?");
+    const day = prompt(
+      "Day of week? (0=Sun 1=Mon 2=Tue 3=Wed 4=Thu 5=Fri 6=Sat)"
+    );
+    const startTime = prompt("Start time (HH:MM)?");
+    const endTime = prompt("End time (HH:MM)?");
+
+    if (
+      !room ||
+      !startDate ||
+      !endDate ||
+      !day ||
+      !startTime ||
+      !endTime
+    ) {
+      return;
+    }
+
+    fetch("/api/recurring-booking", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        room,
+        startDate,
+        endDate,
+        day,
+        startTime,
+        endTime,
+        email: user?.email,
+      }),
+    }).then(async (res) => {
+      const data = await res.json();
+      alert(data.message || "Done");
+      loadData();
+    });
+  }}
+  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+>
+  Recurring Booking
+</button>
+                <button
                   onClick={() => (window.location.href = "/classrooms")}
                   className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                 >
