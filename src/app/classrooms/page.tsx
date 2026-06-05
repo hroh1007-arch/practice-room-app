@@ -321,6 +321,21 @@ export default function ClassroomsPage() {
     setSelection(null);
     setHoverTime(null);
     await loadData();
+    B
+    await fetch("/api/send-booking-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        type: "confirm",
+        email: user.email,
+        room: room.room_number,
+        date: date,
+        startTime: start,
+        endTime: end,
+      }),
+    });
     alert("Classroom booked.");
   }
 
