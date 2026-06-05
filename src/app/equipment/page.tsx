@@ -2,184 +2,124 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import type { User } from "@supabase/supabase-js";
 
 type EquipmentItem = {
   id?: string;
-  inventory_code: string | null;
-  category: string | null;
-  item_name: string | null;
-  manufacturer: string | null;
-  model: string | null;
-  serial_number: string | null;
-  location: string | null;
-  status: string | null;
-  notes: string | null;
+  inventory_code: string;
+  category: string;
+  item_name: string;
+  manufacturer: string;
+  model: string;
+  serial_number: string;
+  location: string;
+  status: string;
+  notes: string;
 };
 
 type Checkout = {
   id?: string;
-  equipment_code: string | null;
-  renter_name: string | null;
-  uni: string | null;
-  email: string | null;
-  instructor: string | null;
-  checkout_date: string | null;
-  return_date: string | null;
-  actual_return_date?: string | null;
-  returned?: boolean | null;
-  notes: string | null;
-};
-
-type RequestRow = {
-  id?: string;
-  equipment_id?: string | null;
-  equipment_code: string | null;
-  item_name: string | null;
-  requester_name?: string | null;
-  requester_email: string | null;
-  requester_uni: string | null;
-  phone?: string | null;
-  programme?: string | null;
-  instructor?: string | null;
-  start_date?: string | null;
-  start_time?: string | null;
-  end_date?: string | null;
-  end_time?: string | null;
-  reason: string | null;
-  status: string | null;
-  created_at?: string | null;
-};
-
-type UserRole = {
+  equipment_code: string;
+  renter_name: string;
+  uni: string;
   email: string;
-  role: "admin" | "instructor";
+  instructor: string;
+  checkout_date: string;
+  return_date: string;
+  actual_return_date?: string;
+  returned?: boolean;
+  notes: string;
 };
 
-const backupAdminEmails = [
+type EquipmentRequest = {
+  id?: string;
+  equipment_id?: string;
+  equipment_code: string;
+  item_name: string;
+  requester_name: string;
+  requester_email: string;
+  requester_uni: string;
+  phone: string;
+  programme: string;
+  instructor: string;
+  start_date: string;
+  start_time: string;
+  end_date: string;
+  end_time: string;
+  reason: string;
+  status: string;
+};
+
+const adminEmails = [
   "hh3144@tc.columbia.edu",
   "jcg21@tc.columbia.edu",
   "instruments@tc.columbia.edu",
   "ma3412@tc.columbia.edu",
 ];
 
-const emptyItem: EquipmentItem = {
-  inventory_code: "",
-  category: "",
-  item_name: "",
-  manufacturer: "",
-  model: "",
-  serial_number: "",
-  location: "",
-  status: "Available",
-  notes: "",
-};
-
-const emptyCheckout: Checkout = {
-  equipment_code: "",
-  renter_name: "",
-  uni: "",
-  email: "",
-  instructor: "",
-  checkout_date: "",
-  return_date: "",
-  actual_return_date: "",
-  returned: false,
-  notes: "",
-};
-
-function today() {
-  return new Date().toISOString().split("T")[0];
-}
-
-function uniFromEmail(email?: string | null) {
-  return email ? email.split("@")[0] : "";
-}
-
 export default function EquipmentPage() {
-  const [user, setUser] = useState<User | null>(null);
-  const [roles, setRoles] = useState<UserRole[]>([]);
+  const [user, setUser] = useState<any>(null);
+
   const [items, setItems] = useState<EquipmentItem[]>([]);
   const [checkouts, setCheckouts] = useState<Checkout[]>([]);
-  const [requests, setRequests] = useState<RequestRow[]>([]);
-  const [view, setView] = useState<"inventory" | "active" | "returned" | "requests">("inventory");
+  const [requests, setRequests] = useState<EquipmentRequest[]>([]);
+
+  const [view, setView] = useState<
+    "inventory" | "active" | "returned" | "requests"
+  >("inventory");
+
   const [search, setSearch] = useState("");
 
-  const [showItemModal, setShowItemModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<EquipmentItem>(emptyItem);
-
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [editingCheckout, setEditingCheckout] = useState<Checkout>(emptyCheckout);
-
   const [showRequestModal, setShowRequestModal] = useState(false);
-  const [requestItemData, setRequestItemData] = useState<EquipmentItem | null>(null);
+
+  const [selectedItem, setSelectedItem] =
+    useState<EquipmentItem | null>(null);
+
   const [requestForm, setRequestForm] = useState({
-    name: "",
-    uni: "",
-    email: "",
+    requester_name: "",
+    requester_email: "",
+    requester_uni: "",
     phone: "",
     programme: "",
     instructor: "",
-    startDate: today(),
-    startTime: "09:00",
-    endDate: today(),
-    endTime: "17:00",
+    start_date: "",
+    start_time: "",
+    end_date: "",
+    end_time: "",
     reason: "",
   });
 
-  const currentRole = user?.email
-    ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
-    : undefined;
+  const isAdmin =
+    user?.email &&
+    adminEmails.includes(user.email.toLowerCase());
 
-  const isBackupAdmin = user?.email
-    ? backupAdminEmails.includes(user.email.toLowerCase())
-    : false;
+  useEffect(() => {
+    loadData();
 
-  const isAdmin = currentRole === "admin" || isBackupAdmin;
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user);
+    });
+  }, []);
 
   async function loadData() {
-    const { data: roleData } = await supabase.from("user_roles").select("*");
-    setRoles(roleData || []);
-
-    const { data: itemData, error: itemError } = await supabase
+    const { data: itemsData } = await supabase
       .from("equipment_items")
       .select("*")
-      .order("category", { ascending: true })
-      .order("inventory_code", { ascending: true });
+      .order("inventory_code");
 
-    if (itemError) alert("Equipment load error: " + itemError.message);
-    setItems(itemData || []);
-
-    const { data: checkoutData, error: checkoutError } = await supabase
+    const { data: checkoutData } = await supabase
       .from("equipment_checkouts")
       .select("*")
       .order("checkout_date", { ascending: false });
 
-    if (checkoutError) alert("Checkout load error: " + checkoutError.message);
-    setCheckouts(checkoutData || []);
-
-    const { data: requestData, error: requestError } = await supabase
+    const { data: requestData } = await supabase
       .from("equipment_requests")
       .select("*")
       .order("created_at", { ascending: false });
 
-    if (requestError) alert("Request load error: " + requestError.message);
+    setItems(itemsData || []);
+    setCheckouts(checkoutData || []);
     setRequests(requestData || []);
   }
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user));
-
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user || null);
-    });
-
-    return () => listener.subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [user?.email]);
 
   async function login() {
     await supabase.auth.signInWithOAuth({
@@ -192,45 +132,732 @@ export default function EquipmentPage() {
 
   async function logout() {
     await supabase.auth.signOut();
-    setUser(null);
+    window.location.reload();
   }
 
-  function matchesSearch(values: Array<string | null | undefined>) {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-
-    return values.some((value) =>
-      String(value || "").toLowerCase().includes(q)
+  function itemCheckedOut(code: string) {
+    return checkouts.some(
+      (c) =>
+        c.equipment_code === code &&
+        !c.returned
     );
   }
 
-  const activeEquipmentCodes = new Set(
-    checkouts
-      .filter((c) => !c.returned)
-      .map((c) => String(c.equipment_code || "").toLowerCase())
+  function openRequestModal(item: EquipmentItem) {
+    setSelectedItem(item);
+
+    setRequestForm({
+      requester_name: "",
+      requester_email: user?.email || "",
+      requester_uni:
+        user?.email?.split("@")[0] || "",
+      phone: "",
+      programme: "",
+      instructor: "",
+      start_date: "",
+      start_time: "",
+      end_date: "",
+      end_time: "",
+      reason: "",
+    });
+
+    setShowRequestModal(true);
+  }
+
+  async function submitRequest() {
+    if (!selectedItem) return;
+
+    const payload = {
+      equipment_id: selectedItem.id,
+      equipment_code:
+        selectedItem.inventory_code,
+      item_name: selectedItem.item_name,
+      ...requestForm,
+      status: "pending",
+    };
+
+    const { error } = await supabase
+      .from("equipment_requests")
+      .insert(payload);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await fetch("/api/equipment-request-email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        equipmentCode:
+          selectedItem.inventory_code,
+        itemName: selectedItem.item_name,
+        requesterName:
+          requestForm.requester_name,
+        requesterUni:
+          requestForm.requester_uni,
+        requesterEmail:
+          requestForm.requester_email,
+        phone: requestForm.phone,
+        programme: requestForm.programme,
+        instructor:
+          requestForm.instructor,
+        startDate:
+          requestForm.start_date,
+        startTime:
+          requestForm.start_time,
+        endDate: requestForm.end_date,
+        endTime: requestForm.end_time,
+        reason: requestForm.reason,
+      }),
+    });
+
+    alert("Request submitted.");
+
+    setShowRequestModal(false);
+
+    loadData();
+  }
+
+  async function approveRequest(
+    request: EquipmentRequest
+  ) {
+    const { error } = await supabase
+      .from("equipment_checkouts")
+      .insert({
+        equipment_code:
+          request.equipment_code,
+        renter_name:
+          request.requester_name,
+        uni: request.requester_uni,
+        email: request.requester_email,
+        instructor:
+          request.instructor,
+        checkout_date:
+          request.start_date,
+        return_date:
+          request.end_date,
+        returned: false,
+        notes: request.reason,
+      });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await supabase
+      .from("equipment_requests")
+      .update({
+        status: "approved",
+      })
+      .eq("id", request.id);
+
+    loadData();
+  }
+
+  async function returnCheckout(
+    checkout: Checkout
+  ) {
+    const actualDate = prompt(
+      "Return date:",
+      new Date().toISOString().split("T")[0]
+    );
+
+    if (!actualDate) return;
+
+    await supabase
+      .from("equipment_checkouts")
+      .update({
+        returned: true,
+        actual_return_date:
+          actualDate,
+      })
+      .eq("id", checkout.id);
+
+    loadData();
+  }
+
+  if (!user) {
+    return (
+      <main className="min-h-screen bg-gray-100 flex items-center justify-center p-8">
+        <div className="bg-white p-8 rounded-2xl shadow-lg border max-w-lg w-full">
+          <h1 className="text-4xl font-bold mb-4">
+            Equipment Inventory
+          </h1>
+
+          <button
+            onClick={login}
+            className="bg-black text-white px-4 py-3 rounded-lg w-full"
+          >
+            Continue with Google
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-gray-100 p-8">
+      <div className="max-w-7xl mx-auto">
+
+        <div className="mb-8">
+          <h1 className="text-5xl font-bold">
+            Equipment Inventory
+          </h1>
+
+          <p className="text-gray-600 mt-2">
+            Inventory: {items.length} items ·
+            Active Rentals: {
+              checkouts.filter(
+                (c) => !c.returned
+              ).length
+            }
+          </p>
+        </div>
+
+        <div className="bg-white border rounded-2xl p-4 mb-6 flex flex-wrap gap-3 items-center">
+
+          <button
+            onClick={() =>
+              setView("inventory")
+            }
+            className="border px-4 py-2 rounded-lg"
+          >
+            Inventory
+          </button>
+
+          <button
+            onClick={() =>
+              setView("active")
+            }
+            className="border px-4 py-2 rounded-lg"
+          >
+            Active Renting
+          </button>
+
+          <button
+            onClick={() =>
+              setView("returned")
+            }
+            className="border px-4 py-2 rounded-lg"
+          >
+            Returned
+          </button>
+
+          {isAdmin && (
+            <button
+              onClick={() =>
+                setView("requests")
+              }
+              className="border px-4 py-2 rounded-lg"
+            >
+              Requests
+            </button>
+          )}
+
+          <input
+            placeholder="Search..."
+            className="border px-4 py-2 rounded-lg ml-auto"
+            value={search}
+            onChange={(e) =>
+              setSearch(e.target.value)
+            }
+          />
+
+          <button
+            onClick={logout}
+            className="border px-4 py-2 rounded-lg"
+          >
+            Log out
+          </button>
+        </div>
+
+        {view === "inventory" && (
+          <div className="bg-white rounded-2xl border shadow-lg overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="border p-3 text-left">
+                    Code
+                  </th>
+                  <th className="border p-3 text-left">
+                    Category
+                  </th>
+                  <th className="border p-3 text-left">
+                    Item
+                  </th>
+                  <th className="border p-3 text-left">
+                    Location
+                  </th>
+                  <th className="border p-3 text-left">
+                    Status
+                  </th>
+                  <th className="border p-3 text-left">
+                    Action
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {items
+                  .filter((item) =>
+                    JSON.stringify(item)
+                      .toLowerCase()
+                      .includes(
+                        search.toLowerCase()
+                      )
+                  )
+                  .map((item) => {
+                    const checked =
+                      itemCheckedOut(
+                        item.inventory_code
+                      );
+
+                    return (
+                      <tr key={item.id}>
+                        <td className="border p-3">
+                          {
+                            item.inventory_code
+                          }
+                        </td>
+
+                        <td className="border p-3">
+                          {item.category}
+                        </td>
+
+                        <td className="border p-3">
+                          {item.item_name}
+                        </td>
+
+                        <td className="border p-3">
+                          {item.location}
+                        </td>
+
+                        <td className="border p-3">
+                          {checked
+                            ? "Checked Out"
+                            : "Available"}
+                        </td>
+
+                        <td className="border p-3">
+                          {!checked && (
+                            <button
+                              onClick={() =>
+                                openRequestModal(
+                                  item
+                                )
+                              }
+                              className="border px-3 py-1 rounded"
+                            >
+                              Request
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {view === "active" && (
+          <div className="bg-white rounded-2xl border shadow-lg overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="border p-3">
+                    Equipment
+                  </th>
+                  <th className="border p-3">
+                    Name
+                  </th>
+                  <th className="border p-3">
+                    UNI
+                  </th>
+                  <th className="border p-3">
+                    Checkout
+                  </th>
+                  <th className="border p-3">
+                    Return
+                  </th>
+                  {isAdmin && (
+                    <th className="border p-3">
+                      Admin
+                    </th>
+                  )}
+                </tr>
+              </thead>
+
+              <tbody>
+                {checkouts
+                  .filter((c) => !c.returned)
+                  .map((c) => (
+                    <tr key={c.id}>
+                      <td className="border p-3">
+                        {c.equipment_code}
+                      </td>
+
+                      <td className="border p-3">
+                        {c.renter_name}
+                      </td>
+
+                      <td className="border p-3">
+                        {c.uni}
+                      </td>
+
+                      <td className="border p-3">
+                        {c.checkout_date}
+                      </td>
+
+                      <td className="border p-3">
+                        {c.return_date}
+                      </td>
+
+                      {isAdmin && (
+                        <td className="border p-3">
+                          <button
+                            onClick={() =>
+                              returnCheckout(c)
+                            }
+                            className="border px-3 py-1 rounded"
+                          >
+                            Return
+                          </button>
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {view === "returned" && (
+          <div className="bg-white rounded-2xl border shadow-lg overflow-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th className="border p-3">
+                    Equipment
+                  </th>
+                  <th className="border p-3">
+                    Name
+                  </th>
+                  <th className="border p-3">
+                    Returned
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {checkouts
+                  .filter((c) => c.returned)
+                  .map((c) => (
+                    <tr key={c.id}>
+                      <td className="border p-3">
+                        {c.equipment_code}
+                      </td>
+
+                      <td className="border p-3">
+                        {c.renter_name}
+                      </td>
+
+                      <td className="border p-3">
+                        {
+                          c.actual_return_date
+                        }
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {view === "requests" &&
+          isAdmin && (
+            <div className="bg-white rounded-2xl border shadow-lg overflow-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="border p-3">
+                      Equipment
+                    </th>
+                    <th className="border p-3">
+                      Name
+                    </th>
+                    <th className="border p-3">
+                      UNI
+                    </th>
+                    <th className="border p-3">
+                      Dates
+                    </th>
+                    <th className="border p-3">
+                      Reason
+                    </th>
+                    <th className="border p-3">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {requests.map((r) => (
+                    <tr key={r.id}>
+                      <td className="border p-3">
+                        {r.equipment_code}
+                      </td>
+
+                      <td className="border p-3">
+                        {r.requester_name}
+                      </td>
+
+                      <td className="border p-3">
+                        {r.requester_uni}
+                      </td>
+
+                      <td className="border p-3">
+                        {r.start_date} →{" "}
+                        {r.end_date}
+                      </td>
+
+                      <td className="border p-3">
+                        {r.reason}
+                      </td>
+
+                      <td className="border p-3">
+                        {r.status !==
+                          "approved" && (
+                          <button
+                            onClick={() =>
+                              approveRequest(
+                                r
+                              )
+                            }
+                            className="border px-3 py-1 rounded"
+                          >
+                            Approve
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+        {showRequestModal &&
+          selectedItem && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+
+              <div className="bg-white rounded-2xl p-6 w-full max-w-2xl">
+
+                <h2 className="text-2xl font-bold mb-4">
+                  Equipment Request
+                </h2>
+
+                <div className="grid grid-cols-2 gap-3">
+
+                  <input
+                    placeholder="Name"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.requester_name
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        requester_name:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    placeholder="UNI"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.requester_uni
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        requester_uni:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    placeholder="Email"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.requester_email
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        requester_email:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    placeholder="Phone"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.phone
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        phone:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    placeholder="Programme"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.programme
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        programme:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    placeholder="Instructor"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.instructor
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        instructor:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    type="date"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.start_date
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        start_date:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    type="time"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.start_time
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        start_time:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    type="date"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.end_date
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        end_date:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                  <input
+                    type="time"
+                    className="border p-2 rounded"
+                    value={
+                      requestForm.end_time
+                    }
+                    onChange={(e) =>
+                      setRequestForm({
+                        ...requestForm,
+                        end_time:
+                          e.target.value,
+                      })
+                    }
+                  />
+
+                </div>
+
+                <textarea
+                  placeholder="Reason"
+                  className="border p-2 rounded w-full mt-3"
+                  value={
+                    requestForm.reason
+                  }
+                  onChange={(e) =>
+                    setRequestForm({
+                      ...requestForm,
+                      reason:
+                        e.target.value,
+                    })
+                  }
+                />
+
+                <div className="flex justify-end gap-2 mt-4">
+
+                  <button
+                    onClick={() =>
+                      setShowRequestModal(
+                        false
+                      )
+                    }
+                    className="border px-4 py-2 rounded"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    onClick={submitRequest}
+                    className="bg-black text-white px-4 py-2 rounded"
+                  >
+                    Submit Request
+                  </button>
+
+                </div>
+
+              </div>
+
+            </div>
+          )}
+
+      </div>
+    </main>
   );
-
-  const activeCheckouts = checkouts.filter((c) => !c.returned);
-  const returnedCheckouts = checkouts.filter((c) => c.returned);
-
-  const shownItems = items.filter((item) =>
-    matchesSearch([
-      item.inventory_code,
-      item.category,
-      item.item_name,
-      item.manufacturer,
-      item.model,
-      item.serial_number,
-      item.location,
-      item.status,
-      item.notes,
-    ])
-  );
-
-  const shownActive = activeCheckouts.filter((c) =>
-    matchesSearch([
-      c.equipment_code,
-      c.renter_name,
-      c.uni,
-      c.email,
-     
+}
