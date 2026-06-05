@@ -321,7 +321,7 @@ export default function ClassroomsPage() {
     setSelection(null);
     setHoverTime(null);
     await loadData();
-    B
+    
     await fetch("/api/send-booking-email", {
       method: "POST",
       headers: {
