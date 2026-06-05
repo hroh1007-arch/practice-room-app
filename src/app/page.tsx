@@ -27,6 +27,15 @@ type UserRole = {
   role: "admin" | "instructor";
 };
 
+type Suspension = {
+  id?: string;
+  email: string;
+  reason?: string | null;
+  active: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
+};
+
 type Selection = {
   room: Room;
   start: string;
@@ -143,6 +152,16 @@ function getWeekRange(selectedDate: string) {
   };
 }
 
+function uniFromEmail(email?: string | null) {
+  if (!email) return "";
+  return email.split("@")[0];
+}
+
+function displayUser(email?: string | null) {
+  if (!email) return "Unknown";
+  return `${uniFromEmail(email)} · ${email}`;
+}
+
 export default function Home() {
   const [user, setUser] = useState<User | null>(null);
 
@@ -151,12 +170,18 @@ export default function Home() {
   const [myBookings, setMyBookings] = useState<Booking[]>([]);
   const [adminBookings, setAdminBookings] = useState<Booking[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
+  const [suspensions, setSuspensions] = useState<Suspension[]>([]);
 
   const [newRoleEmail, setNewRoleEmail] = useState("");
   const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
 
+  const [suspendEmail, setSuspendEmail] = useState("");
+  const [suspendReason, setSuspendReason] = useState("");
+
   const [date, setDate] = useState(localToday());
-  const [view, setView] = useState<"booking" | "myBookings" | "admin" | "roles">("booking");
+  const [view, setView] = useState<
+    "booking" | "myBookings" | "admin" | "roles" | "suspensions"
+  >("booking");
 
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
@@ -185,6 +210,13 @@ export default function Home() {
   async function loadData() {
     const { data: roleData } = await supabase.from("user_roles").select("*");
     setRoles(roleData || []);
+
+    const { data: suspensionData } = await supabase
+      .from("user_suspensions")
+      .select("*")
+      .order("email", { ascending: true });
+
+    setSuspensions(suspensionData || []);
 
     const { data: roomData } = await supabase
       .from("practice_rooms")
@@ -281,15 +313,19 @@ export default function Home() {
     return rooms.find((room) => room.id === roomId)?.room_number || "Room";
   }
 
-  function isBooked(roomId: string, time: string) {
+  function bookingForCell(roomId: string, time: string) {
     const end = cellEnd(time);
 
-    return bookings.some(
+    return bookings.find(
       (b) =>
         b.room_id === roomId &&
         overlaps(b.start_time, b.end_time, time, end) &&
         !bookingEnded(b)
     );
+  }
+
+  function isBooked(roomId: string, time: string) {
+    return Boolean(bookingForCell(roomId, time));
   }
 
   function hasConflict(roomId: string, start: string, end: string) {
@@ -324,7 +360,7 @@ export default function Home() {
       .maybeSingle();
 
     if (data) {
-      alert("Your booking access is temporarily suspended due to repeated no-shows.");
+      alert("Your booking access is suspended.");
       return true;
     }
 
@@ -611,6 +647,56 @@ export default function Home() {
     alert("Role removed.");
   }
 
+  async function suspendUser() {
+    if (!isAdmin) return;
+
+    const email = suspendEmail.trim().toLowerCase();
+
+    if (!email) {
+      alert("Enter an email.");
+      return;
+    }
+
+    const { error } = await supabase.from("user_suspensions").upsert(
+      {
+        email,
+        reason: suspendReason || "Suspended by admin",
+        active: true,
+        starts_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "email",
+      }
+    );
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setSuspendEmail("");
+    setSuspendReason("");
+    await loadData();
+    alert("User suspended.");
+  }
+
+  async function unsuspendUser(email: string) {
+    if (!isAdmin) return;
+
+    const { error } = await supabase
+      .from("user_suspensions")
+      .update({ active: false })
+      .eq("email", email);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadData();
+    alert("User unsuspended.");
+  }
+
   async function createRecurringBooking() {
     if (!hasUnlimitedBooking) {
       alert("Only instructors/admins can create recurring bookings.");
@@ -833,6 +919,13 @@ export default function Home() {
                     >
                       Manage Roles
                     </button>
+
+                    <button
+                      onClick={() => setView("suspensions")}
+                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                    >
+                      Suspensions
+                    </button>
                   </>
                 )}
 
@@ -919,7 +1012,8 @@ export default function Home() {
                       </td>
 
                       {times.map((time) => {
-                        const booked = isBooked(room.id, time);
+                        const booking = bookingForCell(room.id, time);
+                        const booked = Boolean(booking);
                         const preview = isPreview(room.id, time);
                         const past = isPastTime(date, time);
 
@@ -935,7 +1029,7 @@ export default function Home() {
                               onClick={() => handleCellClick(room, time)}
                               className={
                                 booked
-                                  ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 text-xs"
+                                  ? "bg-gray-300 text-gray-700 w-full h-8 cursor-not-allowed border border-gray-300 text-xs"
                                   : past || isPastDate(date)
                                   ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 text-xs"
                                   : preview
@@ -943,7 +1037,7 @@ export default function Home() {
                                   : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
                               }
                             >
-                              {booked ? "Booked" : ""}
+                              {booking ? uniFromEmail(booking.user_email) : ""}
                             </button>
                           </td>
                         );
@@ -1040,7 +1134,7 @@ export default function Home() {
                       </p>
 
                       <p className="text-gray-500 text-sm">
-                        {booking.user_email}
+                        Booker: {displayUser(booking.user_email)}
                       </p>
 
                       {booking.remark && (
@@ -1124,7 +1218,7 @@ export default function Home() {
                     className="border rounded-xl p-4 flex items-center justify-between"
                   >
                     <div>
-                      <p className="font-semibold">{role.email}</p>
+                      <p className="font-semibold">{displayUser(role.email)}</p>
                       <p className="text-gray-600 capitalize">{role.role}</p>
                     </div>
 
@@ -1134,6 +1228,67 @@ export default function Home() {
                     >
                       Remove
                     </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {view === "suspensions" && isAdmin && (
+            <div className="bg-white rounded-2xl shadow-lg border p-6">
+              <h2 className="text-3xl font-bold mb-6">Suspend Users</h2>
+
+              <div className="flex gap-3 mb-6 flex-wrap">
+                <input
+                  type="email"
+                  placeholder="student@tc.columbia.edu"
+                  value={suspendEmail}
+                  onChange={(e) => setSuspendEmail(e.target.value)}
+                  className="border rounded-lg px-4 py-2"
+                />
+
+                <input
+                  type="text"
+                  placeholder="Reason"
+                  value={suspendReason}
+                  onChange={(e) => setSuspendReason(e.target.value)}
+                  className="border rounded-lg px-4 py-2"
+                />
+
+                <button
+                  onClick={suspendUser}
+                  className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                >
+                  Suspend
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {suspensions.map((suspension) => (
+                  <div
+                    key={suspension.email}
+                    className="border rounded-xl p-4 flex items-center justify-between"
+                  >
+                    <div>
+                      <p className="font-semibold">{displayUser(suspension.email)}</p>
+                      <p className="text-gray-600">
+                        Status: {suspension.active ? "Active suspension" : "Inactive"}
+                      </p>
+                      {suspension.reason && (
+                        <p className="text-gray-500 text-sm">
+                          Reason: {suspension.reason}
+                        </p>
+                      )}
+                    </div>
+
+                    {suspension.active && (
+                      <button
+                        onClick={() => unsuspendUser(suspension.email)}
+                        className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                      >
+                        Unsuspend
+                      </button>
+                    )}
                   </div>
                 ))}
               </div>
