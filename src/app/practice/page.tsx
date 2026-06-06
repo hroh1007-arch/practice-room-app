@@ -907,12 +907,15 @@ export default function Home() {
 >
   My Bookings
 </button>
-<button
-  onClick={() => (window.location.href = "/admin-bookings")}
-  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
->
-  Admin Bookings
-</button>
+{isAdmin && (
+  <button
+    onClick={() => (window.location.href = "/admin-bookings")}
+    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+  >
+    Admin
+  </button>
+)}
+
 
 
 
@@ -929,13 +932,6 @@ export default function Home() {
                       className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                     >
                       Manage Roles
-                    </button>
-
-                    <button
-                      onClick={() => setView("suspensions")}
-                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                    >
-                      Suspensions
                     </button>
                   </>
                 )}
