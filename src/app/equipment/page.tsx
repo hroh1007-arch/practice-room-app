@@ -223,7 +223,7 @@ export default function EquipmentPage() {
       match([c.equipment_code, c.renter_name, c.uni, c.email, c.instructor, c.checkout_date, c.return_date, c.actual_return_date, c.notes])
     );
 
-  const shownRequests = requests.filter((r) =>
+  const shownRequests = requests.filter((r) => r.status === "pending").filter((r) =>
     match([r.equipment_code, r.item_name, r.requester_name, r.requester_uni, r.requester_email, r.status, r.reason])
   );
 
