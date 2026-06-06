@@ -879,13 +879,6 @@ export default function Home() {
                   Book Room
                 </button>
 
-                <button
-                  onClick={() => setView("myBookings")}
-                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                >
-                  My Bookings
-                </button>
-
                 {hasUnlimitedBooking && (
                   <>
                     <button
@@ -901,30 +894,44 @@ export default function Home() {
                     >
                       Classrooms
                     </button>
+
+<button
+  onClick={() => (window.location.href = "/equipment")}
+  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+>
+  Equipment
+</button>
+<button
+  onClick={() => (window.location.href = "/my-bookings")}
+  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+>
+  My Bookings
+</button>
+{isAdmin && (
+  <button
+    onClick={() => (window.location.href = "/admin-bookings")}
+    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+  >
+    Admin
+  </button>
+)}
+
+
+
+
+
+
                   </>
                 )}
 
                 {isAdmin && (
                   <>
-                    <button
-                      onClick={() => setView("admin")}
-                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                    >
-                      Admin Bookings
-                    </button>
 
                     <button
                       onClick={() => setView("roles")}
                       className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                     >
                       Manage Roles
-                    </button>
-
-                    <button
-                      onClick={() => setView("suspensions")}
-                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                    >
-                      Suspensions
                     </button>
                   </>
                 )}
