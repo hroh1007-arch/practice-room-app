@@ -614,12 +614,12 @@ export default function EquipmentPage() {
             <button onClick={() => (window.location.href = "/practice")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Practice Rooms</button>
             <button onClick={() => (window.location.href = "/classrooms")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Classrooms</button>
             <button onClick={() => setView("inventory")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Inventory</button>
-            <button onClick={() => setView("active")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Active Renting</button>
-            <button onClick={() => setView("returned")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Returned</button>
+            <button onClick={() => setView("active")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">{isAdmin ? "Active Renting" : "My Rentals"}</button>
+            <button onClick={() => setView("returned")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">{isAdmin ? "Returned" : "History"}</button>
 
             {isAdmin && (
               <>
-                <button onClick={() => setView("requests")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Requests</button>
+                {isAdmin && <button onClick={() => setView("requests")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Requests</button>}
                 {view === "inventory" && <button onClick={openAddItem} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Add Item</button>}
                 {view === "active" && <button onClick={() => openAddCheckout()} className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700">Add Checkout</button>}
               </>
