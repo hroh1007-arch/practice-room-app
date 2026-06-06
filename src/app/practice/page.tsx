@@ -417,34 +417,7 @@ export default function Home() {
   }
 
   async function handleCellClick(room: Room, time: string) {
-  
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const requestedView = params.get("view");
-
-    if (requestedView === "roles") {
-      setView("roles");
-    }
-
-    if (requestedView === "suspensions") {
-      setView("suspensions");
-    }
-  }, []);
-
-
-
-  useEffect(() => {
-    if (!user || !isAdmin) return;
-
-    const savedView = localStorage.getItem("practiceAdminView");
-
-    if (savedView === "roles" || savedView === "suspensions") {
-      setView(savedView as "roles" | "suspensions");
-      localStorage.removeItem("practiceAdminView");
-    }
-  }, [user, isAdmin]);
-
-  if (!user) {
+    if (!user) {
       alert("Please log in first.");
       return;
     }
@@ -899,6 +872,19 @@ export default function Home() {
                   {!isAdmin && isInstructor && <span> · instructor</span>}
                 </span>
 
+                <button
+                  onClick={() => setView("booking")}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  Book Room
+                </button>
+
+                <button
+                  onClick={() => setView("myBookings")}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  My Bookings
+                </button>
 
                 {hasUnlimitedBooking && (
                   <>
@@ -915,39 +901,31 @@ export default function Home() {
                     >
                       Classrooms
                     </button>
-
-<button
-  onClick={() => (window.location.href = "/equipment")}
-  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
->
-  Equipment
-</button>
-<button
-  onClick={() => (window.location.href = "/my-bookings")}
-  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
->
-  My Bookings
-</button>
-{isAdmin && (
-  <button
-    onClick={() => (window.location.href = "/admin-bookings")}
-    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-  >
-    Admin
-  </button>
-)}
-
-
-
-
-
-
                   </>
                 )}
 
                 {isAdmin && (
                   <>
+                    <button
+                      onClick={() => setView("admin")}
+                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                    >
+                      Admin Bookings
+                    </button>
 
+                    <button
+                      onClick={() => setView("roles")}
+                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                    >
+                      Manage Roles
+                    </button>
+
+                    <button
+                      onClick={() => setView("suspensions")}
+                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                    >
+                      Suspensions
+                    </button>
                   </>
                 )}
 
