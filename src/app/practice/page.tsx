@@ -417,7 +417,21 @@ export default function Home() {
   }
 
   async function handleCellClick(room: Room, time: string) {
-    if (!user) {
+  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedView = params.get("view");
+
+    if (requestedView === "roles") {
+      setView("roles");
+    }
+
+    if (requestedView === "suspensions") {
+      setView("suspensions");
+    }
+  }, []);
+
+  if (!user) {
       alert("Please log in first.");
       return;
     }
