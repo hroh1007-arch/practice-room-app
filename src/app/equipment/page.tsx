@@ -493,12 +493,6 @@ export default function EquipmentPage() {
             Continue with TC/CU Google
           </button>
 
-<button
-  onClick={() => (window.location.href = "/my-bookings")}
-  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
->
-  My Bookings
-</button>
 
           <button onClick={() => (window.location.href = "/practice")} className="border px-5 py-3 rounded-lg hover:bg-gray-100 w-full mt-3">
             Back to Practice Rooms
