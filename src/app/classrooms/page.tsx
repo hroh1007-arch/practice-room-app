@@ -115,12 +115,9 @@ function bookingEnded(booking: ClassroomBooking) {
 
 export default function ClassroomsPage() {
   const [user, setUser] = useState<User | null>(null);
-            </div>
-          </div>
-        </div>
-      )}
 
-      <main className="min-h-screen bg-gray-100 p-8">
+  return (
+    <main className="min-h-screen bg-gray-100 p-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <h1 className="text-5xl font-bold text-gray-900">
