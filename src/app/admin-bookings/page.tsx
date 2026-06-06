@@ -283,14 +283,14 @@ export default function AdminBookingsPage() {
           <button onClick={() => (window.location.href = "/equipment")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Equipment</button>
             
             <button
-              onClick={() => setAdminView("roles")}
+              onClick={() => (window.location.href = "/practice?view=roles")}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Manage Roles
             </button>
 
             <button
-              onClick={() => setAdminView("suspensions")}
+              onClick={() => (window.location.href = "/practice?view=suspensions")}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Suspensions
