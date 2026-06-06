@@ -872,12 +872,6 @@ export default function Home() {
                   {!isAdmin && isInstructor && <span> · instructor</span>}
                 </span>
 
-                <button
-                  onClick={() => setView("booking")}
-                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                >
-                  Book Room
-                </button>
 
                 {hasUnlimitedBooking && (
                   <>
@@ -927,12 +921,6 @@ export default function Home() {
                 {isAdmin && (
                   <>
 
-                    <button
-                      onClick={() => setView("roles")}
-                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                    >
-                      Manage Roles
-                    </button>
                   </>
                 )}
 

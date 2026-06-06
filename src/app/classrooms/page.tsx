@@ -630,12 +630,6 @@ export default function ClassroomsPage() {
               Practice Rooms
             </button>
 
-            <button
-              onClick={() => setView("booking")}
-              className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-            >
-              Book Classroom
-            </button>
 <button
   onClick={() => (window.location.href = "/equipment")}
   className="border px-4 py-2 rounded-lg hover:bg-gray-100"
