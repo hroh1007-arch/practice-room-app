@@ -283,14 +283,14 @@ export default function AdminBookingsPage() {
           <button onClick={() => (window.location.href = "/equipment")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Equipment</button>
             
             <button
-              onClick={() => (window.location.href = "/practice?view=roles")}
+              onClick={() => { localStorage.setItem("practiceAdminView", "roles"); window.location.href = "/practice"; }}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Manage Roles
             </button>
 
             <button
-              onClick={() => (window.location.href = "/practice?view=suspensions")}
+              onClick={() => { localStorage.setItem("practiceAdminView", "suspensions"); window.location.href = "/practice"; }}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Suspensions
