@@ -446,11 +446,7 @@ export default function EquipmentPage() {
 
     const { error } = await supabase
       .from("equipment_requests")
-      .update({
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        approved_by: user?.email || "",
-      })
+      .delete()
       .eq("id", request.id);
 
     if (error) {
@@ -467,11 +463,7 @@ export default function EquipmentPage() {
 
     const { error } = await supabase
       .from("equipment_requests")
-      .update({
-        status: "declined",
-        declined_at: new Date().toISOString(),
-        declined_by: user?.email || "",
-      })
+      .delete()
       .eq("id", request.id);
 
     if (error) {
