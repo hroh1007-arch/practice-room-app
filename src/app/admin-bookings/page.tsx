@@ -83,6 +83,7 @@ function bookingEnded(booking: { booking_date: string; end_time: string }) {
 }
 
 export default function AdminBookingsPage() {
+  const [adminView, setAdminView] = useState<"bookings" | "roles" | "suspensions">("bookings");
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -282,14 +283,14 @@ export default function AdminBookingsPage() {
           <button onClick={() => (window.location.href = "/equipment")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Equipment</button>
             
             <button
-              onClick={() => (window.location.href = "/practice?view=roles")}
+              onClick={() => setAdminView("roles")}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Manage Roles
             </button>
 
             <button
-              onClick={() => (window.location.href = "/practice?view=suspensions")}
+              onClick={() => setAdminView("suspensions")}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Suspensions
