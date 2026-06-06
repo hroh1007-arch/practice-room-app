@@ -223,6 +223,36 @@ export default function AdminBookingsPage() {
     await loadData();
   }
 
+
+  async function createSuspensionPrompt() {
+    const email = window.prompt("Student email / UNI email to suspend:");
+    if (!email) return;
+
+    const startDate = window.prompt("Suspension start date, example 2026-06-05:");
+    if (!startDate) return;
+
+    const endDate = window.prompt("Suspension end date, example 2026-06-12:");
+    if (!endDate) return;
+
+    const reason = window.prompt("Reason for suspension:");
+    if (!reason) return;
+
+    const fullReason = `${startDate} to ${endDate}: ${reason}`;
+
+    const { error } = await supabase.from("user_suspensions").upsert({
+      email: email.trim().toLowerCase(),
+      reason: fullReason,
+      active: true,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Suspension saved.");
+  }
+
   if (!user) {
     return (
       <main className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
@@ -290,7 +320,7 @@ export default function AdminBookingsPage() {
             </button>
 
             <button
-              onClick={() => { localStorage.setItem("practiceAdminView", "suspensions"); window.location.href = "/admin-roles"; }}
+              onClick={createSuspensionPrompt}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Suspensions
