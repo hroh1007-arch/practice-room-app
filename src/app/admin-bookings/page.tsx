@@ -36,6 +36,20 @@ type ClassroomBooking = {
   recurring_series_id?: string | null;
 };
 
+type EquipmentCheckout = {
+  id: string;
+  equipment_code: string | null;
+  renter_name: string | null;
+  uni: string | null;
+  email: string | null;
+  instructor: string | null;
+  checkout_date: string | null;
+  return_date: string | null;
+  actual_return_date?: string | null;
+  returned?: boolean | null;
+  notes: string | null;
+};
+
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
   "jcg21@tc.columbia.edu",
@@ -75,6 +89,7 @@ export default function AdminBookingsPage() {
   const [classrooms, setClassrooms] = useState<Room[]>([]);
   const [practiceBookings, setPracticeBookings] = useState<PracticeBooking[]>([]);
   const [classroomBookings, setClassroomBookings] = useState<ClassroomBooking[]>([]);
+  const [equipmentCheckouts, setEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -119,6 +134,14 @@ export default function AdminBookingsPage() {
       .order("start_time", { ascending: true });
 
     setClassroomBookings((classroomBookingData || []).filter((b) => !bookingEnded(b)));
+
+    const { data: checkoutData } = await supabase
+      .from("equipment_checkouts")
+      .select("*")
+      .eq("returned", false)
+      .order("checkout_date", { ascending: true });
+
+    setEquipmentCheckouts(checkoutData || []);
   }
 
   useEffect(() => {
@@ -169,6 +192,27 @@ export default function AdminBookingsPage() {
     if (!confirm("Cancel this classroom booking?")) return;
 
     const { error } = await supabase.from("classroom_bookings").delete().eq("id", id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadData();
+  }
+
+  async function returnEquipment(checkout: EquipmentCheckout) {
+    const returnDate = prompt("Actual return date:", new Date().toISOString().split("T")[0]);
+
+    if (!returnDate) return;
+
+    const { error } = await supabase
+      .from("equipment_checkouts")
+      .update({
+        returned: true,
+        actual_return_date: returnDate,
+      })
+      .eq("id", checkout.id);
 
     if (error) {
       alert(error.message);
@@ -303,6 +347,44 @@ export default function AdminBookingsPage() {
                     className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
                   >
                     Cancel
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-white rounded-2xl shadow-lg border p-6">
+            <h2 className="text-3xl font-bold mb-4">Equipment Renting</h2>
+
+            {equipmentCheckouts.length === 0 && (
+              <p className="text-gray-600">No active equipment renting.</p>
+            )}
+
+            <div className="space-y-4">
+              {equipmentCheckouts.map((checkout) => (
+                <div key={checkout.id} className="border rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-lg">{checkout.equipment_code}</p>
+                    <p className="text-gray-600">
+                      {checkout.renter_name} · {checkout.uni}
+                    </p>
+                    <p className="text-gray-500 text-sm">{checkout.email}</p>
+                    <p className="text-gray-500 text-sm">
+                      Checkout: {checkout.checkout_date || "—"} · Due: {checkout.return_date || "—"}
+                    </p>
+                    {checkout.instructor && (
+                      <p className="text-gray-500 text-sm">Instructor: {checkout.instructor}</p>
+                    )}
+                    {checkout.notes && (
+                      <p className="text-gray-500 text-sm">Notes: {checkout.notes}</p>
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => returnEquipment(checkout)}
+                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                  >
+                    Return
                   </button>
                 </div>
               ))}
