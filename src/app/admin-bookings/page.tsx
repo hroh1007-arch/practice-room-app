@@ -410,7 +410,7 @@ if (!user) {
             </button>
 
             <button
-              onClick={() => setShowSuspensionModal(true)}
+              onClick={() => (window.location.href = "/admin-suspensions")}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Suspensions
