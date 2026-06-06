@@ -302,6 +302,24 @@ export default function AdminBookingsPage() {
           </span>
         </div>
 
+        {adminView === "roles" && (
+          <section className="bg-white rounded-2xl shadow-lg border p-6 mb-8">
+            <h2 className="text-3xl font-bold mb-4">Manage Roles</h2>
+            <p className="text-gray-600">
+              Role management section selected.
+            </p>
+          </section>
+        )}
+
+        {adminView === "suspensions" && (
+          <section className="bg-white rounded-2xl shadow-lg border p-6 mb-8">
+            <h2 className="text-3xl font-bold mb-4">Suspensions</h2>
+            <p className="text-gray-600">
+              Suspension management section selected.
+            </p>
+          </section>
+        )}
+
         <div className="space-y-8">
           <section className="bg-white rounded-2xl shadow-lg border p-6">
             <h2 className="text-3xl font-bold mb-4">Practice Room Bookings</h2>
