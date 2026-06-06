@@ -394,35 +394,7 @@ export default function MyBookingsPage() {
             </div>
           </section>
 
-          <section className="bg-white rounded-2xl shadow-lg border p-6">
-            <h2 className="text-3xl font-bold mb-4">Equipment Requests</h2>
-
-            {equipmentRequests.length === 0 && (
-              <p className="text-gray-600">No equipment requests.</p>
-            )}
-
-            <div className="space-y-4">
-              {equipmentRequests.map((request) => (
-                <div key={request.id} className="border rounded-xl p-4">
-                  <p className="font-semibold text-lg">
-                    {request.equipment_code} · {request.item_name}
-                  </p>
-
-                  <p className="text-gray-600">
-                    {request.start_date || "—"} → {request.end_date || "—"}
-                  </p>
-
-                  <p className="text-gray-500 text-sm">
-                    Status: {request.status || "pending"}
-                  </p>
-
-                  {request.reason && (
-                    <p className="text-gray-500 text-sm">Reason: {request.reason}</p>
-                  )}
-                </div>
-              ))}
-            </div>
-          </section>
+          
         </div>
       </div>
     </main>
