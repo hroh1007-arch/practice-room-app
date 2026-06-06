@@ -91,7 +91,12 @@ export default function AdminSuspensionsPage() {
     const cleanUni = uni.trim().toLowerCase();
     const email = uniToEmail(cleanUni);
 
-    const { error } = await supabase.from("user_suspensions").upsert({
+    await supabase
+      .from("user_suspensions")
+      .delete()
+      .eq("email", email);
+
+    const { error } = await supabase.from("user_suspensions").insert({
       email,
       name: name.trim(),
       uni: cleanUni,
