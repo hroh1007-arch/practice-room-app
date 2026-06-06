@@ -280,6 +280,21 @@ export default function AdminBookingsPage() {
           <button onClick={() => (window.location.href = "/practice")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Practice Rooms</button>
           <button onClick={() => (window.location.href = "/classrooms")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Classrooms</button>
           <button onClick={() => (window.location.href = "/equipment")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Equipment</button>
+            
+            <button
+              onClick={() => (window.location.href = "/practice?view=roles")}
+              className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+            >
+              Manage Roles
+            </button>
+
+            <button
+              onClick={() => (window.location.href = "/practice?view=suspensions")}
+              className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+            >
+              Suspensions
+            </button>
+
 
           <span className="text-gray-700 ml-auto">
             Logged in as <strong>{user.email}</strong>
