@@ -84,6 +84,12 @@ function bookingEnded(booking: { booking_date: string; end_time: string }) {
 
 export default function AdminBookingsPage() {
   const [adminView, setAdminView] = useState<"bookings" | "roles" | "suspensions">("bookings");
+  const [showSuspensionModal, setShowSuspensionModal] = useState(false);
+  const [suspensionEmail, setSuspensionEmail] = useState("");
+  const [suspensionStart, setSuspensionStart] = useState("");
+  const [suspensionEnd, setSuspensionEnd] = useState("");
+  const [suspensionReason, setSuspensionReason] = useState("");
+
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<Role[]>([]);
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -253,7 +259,35 @@ export default function AdminBookingsPage() {
     alert("Suspension saved.");
   }
 
-  if (!user) {
+  
+async function createSuspension() {
+  const fullReason =
+    suspensionStart + " to " + suspensionEnd + ": " + suspensionReason;
+
+  const { error } = await supabase
+    .from("user_suspensions")
+    .upsert({
+      email: suspensionEmail.trim().toLowerCase(),
+      reason: fullReason,
+      active: true,
+    });
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  setShowSuspensionModal(false);
+  setSuspensionEmail("");
+  setSuspensionStart("");
+  setSuspensionEnd("");
+  setSuspensionReason("");
+
+  alert("Suspension saved.");
+}
+
+if (!user) {
+
     return (
       <main className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
         <div className="bg-white border rounded-2xl shadow-lg p-8 max-w-lg w-full">
@@ -274,7 +308,63 @@ export default function AdminBookingsPage() {
             Back to Main Menu
           </button>
         </div>
-      </main>
+      
+
+      {showSuspensionModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+            <h2 className="text-2xl font-bold mb-4">Suspend User</h2>
+
+            <div className="space-y-3">
+              <input
+                value={suspensionEmail}
+                onChange={(e) => setSuspensionEmail(e.target.value)}
+                placeholder="Email"
+                className="w-full border rounded-lg px-4 py-2"
+              />
+
+              <input
+                type="date"
+                value={suspensionStart}
+                onChange={(e) => setSuspensionStart(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2"
+              />
+
+              <input
+                type="date"
+                value={suspensionEnd}
+                onChange={(e) => setSuspensionEnd(e.target.value)}
+                className="w-full border rounded-lg px-4 py-2"
+              />
+
+              <textarea
+                value={suspensionReason}
+                onChange={(e) => setSuspensionReason(e.target.value)}
+                placeholder="Reason"
+                className="w-full border rounded-lg px-4 py-2"
+              />
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={createSuspension}
+                className="bg-black text-white px-4 py-2 rounded-lg"
+              >
+                Save Suspension
+              </button>
+
+              <button
+                onClick={() => setShowSuspensionModal(false)}
+                className="border px-4 py-2 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+</main>
     );
   }
 
@@ -320,7 +410,7 @@ export default function AdminBookingsPage() {
             </button>
 
             <button
-              onClick={createSuspensionPrompt}
+              onClick={() => setShowSuspensionModal(true)}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Suspensions
