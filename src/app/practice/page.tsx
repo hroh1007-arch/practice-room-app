@@ -431,6 +431,16 @@ export default function Home() {
     }
   }, []);
 
+
+  useEffect(() => {
+    const savedView = localStorage.getItem("practiceAdminView");
+
+    if (savedView === "roles" || savedView === "suspensions") {
+      setView(savedView);
+      localStorage.removeItem("practiceAdminView");
+    }
+  }, []);
+
   if (!user) {
       alert("Please log in first.");
       return;
