@@ -432,14 +432,17 @@ export default function Home() {
   }, []);
 
 
+
   useEffect(() => {
+    if (!user || !isAdmin) return;
+
     const savedView = localStorage.getItem("practiceAdminView");
 
     if (savedView === "roles" || savedView === "suspensions") {
-      setView(savedView);
+      setView(savedView as "roles" | "suspensions");
       localStorage.removeItem("practiceAdminView");
     }
-  }, []);
+  }, [user, isAdmin]);
 
   if (!user) {
       alert("Please log in first.");
