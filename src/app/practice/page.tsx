@@ -1197,7 +1197,7 @@ export default function Home() {
                                   : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
                               }
                             >
-                              {booking
+                              {booking && cleanTime(booking.start_time) === time
                                 ? [uniFromEmail(booking.user_email), booking.remark]
                                     .filter(Boolean)
                                     .join(" · ")
