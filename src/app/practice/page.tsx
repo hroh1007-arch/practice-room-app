@@ -17,6 +17,7 @@ type Booking = {
   start_time: string;
   end_time: string;
   user_email: string;
+  user_name?: string | null;
   remark?: string | null;
   recurring_series_id?: string | null;
 };
@@ -69,6 +70,22 @@ const times = [
 ];
 
 const allowedDomains = ["@tc.columbia.edu", "@columbia.edu"];
+
+
+function displayNameFromUser(user: any) {
+  return (
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "there"
+  );
+}
+
+function displayPerson(name?: string | null, email?: string | null) {
+  const uni = email ? email.split("@")[0] : "";
+  if (name && uni) return `${name} (${uni})`;
+  return name || uni || "Unknown";
+}
 
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
@@ -1108,7 +1125,7 @@ export default function Home() {
                 )}
 
                 <span className="text-gray-700">
-                  Logged in as <strong>{user.email}</strong>
+                  Hello <strong>{displayNameFromUser(user)}</strong> · Logged in as <strong>{user.email}</strong>
                   {isAdmin && <span> · admin</span>}
                   {!isAdmin && isInstructor && <span> · instructor</span>}
                 </span>
@@ -1220,10 +1237,10 @@ export default function Home() {
                             cells.push(
                               <td key={booking.id} colSpan={colSpan} className="border-b p-0">
                                 <div
-                                  title={[uniFromEmail(booking.user_email), booking.remark].filter(Boolean).join(" · ")}
+                                  title={[displayPerson(booking.user_name, booking.user_email), booking.remark].filter(Boolean).join(" · ")}
                                   className="bg-gray-300 text-gray-700 w-full h-8 border border-gray-300 text-xs overflow-hidden whitespace-nowrap px-2 flex items-center justify-center"
                                 >
-                                  {[uniFromEmail(booking.user_email), booking.remark].filter(Boolean).join(" · ")}
+                                  {[displayPerson(booking.user_name, booking.user_email), booking.remark].filter(Boolean).join(" · ")}
                                 </div>
                               </td>
                             );
@@ -1284,7 +1301,7 @@ export default function Home() {
                   >
                     <div>
                       <p className="font-semibold text-lg">
-                        {roomName(booking.room_id)}
+                        {roomName(booking.room_id)} · {displayPerson(booking.user_name, booking.user_email)}
                       </p>
 
                       <p className="text-gray-600">
@@ -1353,7 +1370,7 @@ export default function Home() {
                       </p>
 
                       <p className="text-gray-500 text-sm">
-                        Booker: {displayUser(booking.user_email)}
+                        Booker: {displayPerson(booking.user_name, booking.user_email)}
                       </p>
 
                       {booking.remark && (
