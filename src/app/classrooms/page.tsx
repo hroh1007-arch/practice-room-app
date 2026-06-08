@@ -812,6 +812,15 @@ export default function ClassroomsPage() {
       )}
 
       <main className="min-h-screen bg-gray-100 p-8">
+        {isAdmin && (
+          <button
+            onClick={() => (window.location.href = "/admin-bookings")}
+            className="fixed right-8 top-8 z-50 border bg-white px-4 py-2 rounded-lg shadow-sm hover:bg-gray-100"
+          >
+            Admin
+          </button>
+        )}
+
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <h1 className="text-5xl font-bold text-gray-900">
@@ -878,15 +887,6 @@ export default function ClassroomsPage() {
             >
               My Bookings
             </button>
-
-            {isAdmin && (
-              <button
-                onClick={() => (window.location.href = "/admin-bookings")}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
-                Admin
-              </button>
-            )}
 
             {selection && (
               <button
