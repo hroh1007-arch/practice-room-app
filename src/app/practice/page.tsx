@@ -584,10 +584,25 @@ export default function Home() {
     setHoverTime(null);
     await loadData();
 
+    await fetch("/api/send-booking-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "confirm",
+        email: user.email,
+        room: room.room_number,
+        date,
+        startTime: start,
+        endTime: end,
+      }),
+    });
+
     alert("Booked.");
   }
 
   async function cancelBooking(id: string) {
+    const bookingToCancel = myBookings.find((booking) => booking.id === id) || adminBookings.find((booking) => booking.id === id);
+
     const confirmed = window.confirm("Cancel this booking?");
     if (!confirmed) return;
 
@@ -596,6 +611,21 @@ export default function Home() {
     if (error) {
       alert(error.message);
       return;
+    }
+
+    if (bookingToCancel) {
+      await fetch("/api/send-booking-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "cancel",
+          email: bookingToCancel.user_email,
+          room: roomName(bookingToCancel.room_id),
+          date: bookingToCancel.booking_date,
+          startTime: cleanTime(bookingToCancel.start_time),
+          endTime: cleanTime(bookingToCancel.end_time),
+        }),
+      });
     }
 
     await loadData();
