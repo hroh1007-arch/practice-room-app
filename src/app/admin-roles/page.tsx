@@ -9,6 +9,11 @@ type RoleRow = {
   role: "admin" | "instructor";
 };
 
+type InstructorHourLimit = {
+  instructor_email: string;
+  weekly_hour_limit: number;
+};
+
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
   "jcg21@tc.columbia.edu",
@@ -19,6 +24,7 @@ const backupAdminEmails = [
 export default function AdminRolesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<RoleRow[]>([]);
+  const [hourLimits, setHourLimits] = useState<InstructorHourLimit[]>([]);
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "instructor">("instructor");
 
@@ -43,6 +49,17 @@ export default function AdminRolesPage() {
     }
 
     setRoles((data || []) as RoleRow[]);
+
+    const { data: limitData, error: limitError } = await supabase
+      .from("instructor_hour_limits")
+      .select("instructor_email, weekly_hour_limit");
+
+    if (limitError) {
+      alert(limitError.message);
+      return;
+    }
+
+    setHourLimits((limitData || []) as InstructorHourLimit[]);
   }
 
   useEffect(() => {
@@ -96,6 +113,44 @@ export default function AdminRolesPage() {
       .from("user_roles")
       .update({ role: newRole })
       .eq("email", row.email);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadData();
+  }
+
+  function hourLimitFor(email: string) {
+    return hourLimits.find(
+      (limit) => limit.instructor_email.toLowerCase() === email.toLowerCase()
+    )?.weekly_hour_limit;
+  }
+
+  async function saveHourLimit(row: RoleRow) {
+    const currentLimit = hourLimitFor(row.email);
+    const value = prompt(
+      `Weekly hour limit for ${row.email}:`,
+      currentLimit === undefined ? "" : String(currentLimit)
+    );
+
+    if (value === null) return;
+
+    const weeklyHourLimit = Number(value);
+
+    if (!Number.isFinite(weeklyHourLimit) || weeklyHourLimit < 0) {
+      alert("Enter a valid number of hours.");
+      return;
+    }
+
+    const { error } = await supabase.from("instructor_hour_limits").upsert(
+      {
+        instructor_email: row.email.trim().toLowerCase(),
+        weekly_hour_limit: weeklyHourLimit,
+      },
+      { onConflict: "instructor_email" }
+    );
 
     if (error) {
       alert(error.message);
@@ -243,6 +298,7 @@ export default function AdminRolesPage() {
               <tr className="bg-gray-50">
                 <th className="p-3 border text-left">Email</th>
                 <th className="p-3 border text-left">Role</th>
+                <th className="p-3 border text-left">Weekly Limit</th>
                 <th className="p-3 border text-left">Actions</th>
               </tr>
             </thead>
@@ -266,6 +322,21 @@ export default function AdminRolesPage() {
                   </td>
 
                   <td className="p-3 border">
+                    {row.role === "instructor" ? (
+                      <button
+                        onClick={() => saveHourLimit(row)}
+                        className="border px-3 py-1 rounded hover:bg-gray-100"
+                      >
+                        {hourLimitFor(row.email) === undefined
+                          ? "Set Hour Limit"
+                          : `${hourLimitFor(row.email)} hrs/week`}
+                      </button>
+                    ) : (
+                      <span className="text-gray-500">Admin unlimited</span>
+                    )}
+                  </td>
+
+                  <td className="p-3 border">
                     <button
                       onClick={() => removeRole(row)}
                       className="bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-700"
@@ -278,7 +349,7 @@ export default function AdminRolesPage() {
 
               {roles.length === 0 && (
                 <tr>
-                  <td className="p-6 text-gray-500" colSpan={3}>
+                  <td className="p-6 text-gray-500" colSpan={4}>
                     No roles found.
                   </td>
                 </tr>
