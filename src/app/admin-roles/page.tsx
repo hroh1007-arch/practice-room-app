@@ -284,6 +284,13 @@ export default function AdminRolesPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
+      <button
+        onClick={() => (window.location.href = "/admin-bookings")}
+        className="fixed right-8 top-8 z-50 border bg-white px-4 py-2 rounded-lg shadow-sm hover:bg-gray-100"
+      >
+        Admin
+      </button>
+
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
           <h1 className="text-5xl font-bold text-gray-900">Manage Roles</h1>
@@ -293,13 +300,6 @@ export default function AdminRolesPage() {
         </div>
 
         <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border flex gap-4 items-center flex-wrap">
-          <button
-            onClick={() => (window.location.href = "/admin-bookings")}
-            className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-          >
-            Admin Bookings
-          </button>
-
           <button
             onClick={() => (window.location.href = "/practice")}
             className="border px-4 py-2 rounded-lg hover:bg-gray-100"
