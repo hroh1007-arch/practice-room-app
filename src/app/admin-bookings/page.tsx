@@ -21,6 +21,7 @@ type PracticeBooking = {
   start_time: string;
   end_time: string;
   user_email: string;
+  user_name?: string | null;
   remark?: string | null;
   recurring_series_id?: string | null;
 };
@@ -32,6 +33,7 @@ type ClassroomBooking = {
   start_time: string;
   end_time: string;
   user_email: string;
+  user_name?: string | null;
   remark?: string | null;
   recurring_series_id?: string | null;
 };
@@ -49,6 +51,22 @@ type EquipmentCheckout = {
   returned?: boolean | null;
   notes: string | null;
 };
+
+
+function displayNameFromUser(user: any) {
+  return (
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "there"
+  );
+}
+
+function displayPerson(name?: string | null, email?: string | null) {
+  const uni = email ? email.split("@")[0] : "";
+  if (name && uni) return `${name} (${uni})`;
+  return name || uni || "Unknown";
+}
 
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
@@ -362,7 +380,7 @@ export default function AdminBookingsPage() {
 
 
           <span className="text-gray-700 ml-auto">
-            Logged in as <strong>{user.email}</strong>
+            Hello <strong>{displayNameFromUser(user)}</strong> · Logged in as <strong>{user.email}</strong>
           </span>
         </div>
 
@@ -400,7 +418,7 @@ export default function AdminBookingsPage() {
                     <p className="text-gray-600">
                       {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
                     </p>
-                    <p className="text-gray-500 text-sm">{booking.user_email}</p>
+                    <p className="text-gray-500 text-sm">{displayPerson(booking.user_name, booking.user_email)}</p>
                     {booking.remark && <p className="text-gray-500 text-sm">Remark: {booking.remark}</p>}
                     {booking.recurring_series_id && (
                       <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">Recurring</span>
@@ -433,7 +451,7 @@ export default function AdminBookingsPage() {
                     <p className="text-gray-600">
                       {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
                     </p>
-                    <p className="text-gray-500 text-sm">{booking.user_email}</p>
+                    <p className="text-gray-500 text-sm">{displayPerson(booking.user_name, booking.user_email)}</p>
                     {booking.remark && <p className="text-gray-500 text-sm">Remark: {booking.remark}</p>}
                     {booking.recurring_series_id && (
                       <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">Recurring</span>
