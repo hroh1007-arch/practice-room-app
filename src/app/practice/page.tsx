@@ -910,12 +910,6 @@ export default function Home() {
 
                     
 
-                    <button
-                      onClick={() => setView("suspensions")}
-                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                    >
-                      Suspensions
-                    </button>
                   </>
                 )}
 
