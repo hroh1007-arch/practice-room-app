@@ -320,6 +320,8 @@ export default function EquipmentPage() {
       notes: editingCheckout.notes,
     };
 
+    const isNewCheckout = !editingCheckout.id;
+
     const result = editingCheckout.id
       ? await supabase.from("equipment_checkouts").update(payload).eq("id", editingCheckout.id)
       : await supabase.from("equipment_checkouts").insert(payload);
@@ -327,6 +329,24 @@ export default function EquipmentPage() {
     if (result.error) {
       alert(result.error.message);
       return;
+    }
+
+    if (isNewCheckout) {
+      await fetch("/api/equipment-request-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "checkout",
+          equipmentCode: payload.equipment_code,
+          requesterName: payload.renter_name,
+          requesterUni: payload.uni,
+          requesterEmail: payload.email,
+          instructor: payload.instructor,
+          startDate: payload.checkout_date,
+          endDate: payload.return_date,
+          reason: payload.notes,
+        }),
+      });
     }
 
     setShowCheckoutModal(false);
@@ -366,6 +386,22 @@ export default function EquipmentPage() {
       alert(error.message);
       return;
     }
+
+    await fetch("/api/equipment-request-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "return",
+        equipmentCode: checkout.equipment_code,
+        requesterName: checkout.renter_name,
+        requesterUni: checkout.uni,
+        requesterEmail: checkout.email,
+        instructor: checkout.instructor,
+        startDate: checkout.checkout_date,
+        endDate: returnDate,
+        reason: checkout.notes,
+      }),
+    });
 
     await loadData();
   }
@@ -419,6 +455,27 @@ export default function EquipmentPage() {
       return;
     }
 
+    await fetch("/api/equipment-request-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "request",
+        equipmentCode: requestItem.inventory_code,
+        itemName: requestItem.item_name || requestItem.model || "",
+        requesterName: requestForm.requester_name,
+        requesterUni: requestForm.requester_uni,
+        requesterEmail: requestForm.requester_email,
+        phone: requestForm.phone,
+        programme: requestForm.programme,
+        instructor: requestForm.instructor,
+        startDate: requestForm.start_date,
+        startTime: requestForm.start_time,
+        endDate: requestForm.end_date,
+        endTime: requestForm.end_time,
+        reason: requestForm.reason,
+      }),
+    });
+
     setShowRequestModal(false);
     await loadData();
     alert("Request submitted.");
@@ -454,6 +511,25 @@ export default function EquipmentPage() {
       return;
     }
 
+    await fetch("/api/equipment-request-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "approve",
+        equipmentCode: request.equipment_code,
+        itemName: request.item_name,
+        requesterName: request.requester_name,
+        requesterUni: request.requester_uni,
+        requesterEmail: request.requester_email,
+        instructor: request.instructor,
+        startDate: request.start_date,
+        startTime: request.start_time,
+        endDate: request.end_date,
+        endTime: request.end_time,
+        reason: request.reason,
+      }),
+    });
+
     await loadData();
     alert("Request approved and moved to active renting.");
   }
@@ -470,6 +546,25 @@ export default function EquipmentPage() {
       alert(error.message);
       return;
     }
+
+    await fetch("/api/equipment-request-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "decline",
+        equipmentCode: request.equipment_code,
+        itemName: request.item_name,
+        requesterName: request.requester_name,
+        requesterUni: request.requester_uni,
+        requesterEmail: request.requester_email,
+        instructor: request.instructor,
+        startDate: request.start_date,
+        startTime: request.start_time,
+        endDate: request.end_date,
+        endTime: request.end_time,
+        reason: request.reason,
+      }),
+    });
 
     await loadData();
     alert("Request declined.");
