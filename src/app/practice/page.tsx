@@ -1066,12 +1066,14 @@ export default function Home() {
                   Practice Rooms
                 </button>
 
-                <button
-                  onClick={() => (window.location.href = "/classrooms")}
-                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                >
-                  Classrooms
-                </button>
+                {hasUnlimitedBooking && (
+                  <button
+                    onClick={() => (window.location.href = "/classrooms")}
+                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                  >
+                    Classrooms
+                  </button>
+                )}
 
                 <button
                   onClick={() => (window.location.href = "/equipment")}
