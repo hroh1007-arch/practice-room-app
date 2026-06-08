@@ -287,14 +287,27 @@ export default function Home() {
   }
 
   async function checkUser(currentUser: User | null) {
-    if (
-      currentUser &&
-      !allowedDomains.some((domain) => currentUser.email?.endsWith(domain))
-    ) {
-      await supabase.auth.signOut();
-      alert("Only TC or Columbia Google accounts are allowed.");
+    if (!currentUser) {
       setUser(null);
       return;
+    }
+
+    const email = currentUser.email?.toLowerCase() || "";
+    const allowedDomain = allowedDomains.some((domain) => email.endsWith(domain));
+
+    if (!allowedDomain) {
+      const { data: authorizedUser } = await supabase
+        .from("authorized_users")
+        .select("email")
+        .eq("email", email)
+        .maybeSingle();
+
+      if (!authorizedUser) {
+        await supabase.auth.signOut();
+        alert("Only TC, Columbia, or authorized users are allowed.");
+        setUser(null);
+        return;
+      }
     }
 
     setUser(currentUser);
