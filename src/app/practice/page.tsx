@@ -558,9 +558,18 @@ export default function Home() {
       }
     }
 
+    const bookeeEmail = isAdmin
+      ? (window.prompt("Book for which email?", user.email || "") || user.email || "").trim().toLowerCase()
+      : user.email;
+
+    if (!bookeeEmail) {
+      alert("Bookee email is required.");
+      return;
+    }
+
     const remark = window.prompt("Optional note/remark for this booking:", "") || "";
 
-    const confirmed = window.confirm(`Book ${room.room_number} from ${start} to ${end}?`);
+    const confirmed = window.confirm(`Book ${room.room_number} from ${start} to ${end} for ${bookeeEmail}?`);
     if (!confirmed) return;
 
     const { error } = await supabase.from("bookings").insert({
@@ -568,7 +577,7 @@ export default function Home() {
       booking_date: date,
       start_time: start,
       end_time: end,
-      user_email: user.email,
+      user_email: bookeeEmail,
       user_id: user.id,
       remark,
       checked_in: hasUnlimitedBooking,
@@ -589,7 +598,7 @@ export default function Home() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: "confirm",
-        email: user.email,
+        email: bookeeEmail,
         room: room.room_number,
         date,
         startTime: start,
