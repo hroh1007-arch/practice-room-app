@@ -168,15 +168,7 @@ export default function ClassroomsPage() {
       .select("*")
       .order("room_number");
 
-    const defaultRooms = [
-      { id: "435", room_number: "435" },
-      { id: "519", room_number: "519" },
-      { id: "522", room_number: "522" },
-      { id: "524", room_number: "524" },
-      { id: "526", room_number: "526" },
-    ];
-
-    setClassrooms(classroomData && classroomData.length > 0 ? classroomData : defaultRooms);
+    setClassrooms(classroomData || []);
 
     const { data: bookingData } = await supabase
       .from("classroom_bookings")
