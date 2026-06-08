@@ -145,7 +145,10 @@ export default function ClassroomsPage() {
   const [recurringWeekday, setRecurringWeekday] = useState("1");
   const [recurringStartTime, setRecurringStartTime] = useState("09:00");
   const [recurringEndTime, setRecurringEndTime] = useState("10:00");
-  const [recurringRemark, setRecurringRemark] = useState("");
+  const [recurringBookeeEmail, setRecurringBookeeEmail] = useState("");
+  const [recurringInstructor, setRecurringInstructor] = useState("");
+  const [recurringCourseName, setRecurringCourseName] = useState("");
+  const [recurringCourseCode, setRecurringCourseCode] = useState("");
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -459,6 +462,23 @@ export default function ClassroomsPage() {
       return;
     }
 
+    const bookeeEmail = (isAdmin ? recurringBookeeEmail : user?.email || "")
+      .trim()
+      .toLowerCase();
+
+    if (!bookeeEmail) {
+      alert("Bookee email is required.");
+      return;
+    }
+
+    const remark = [
+      recurringInstructor && `Instructor: ${recurringInstructor}`,
+      recurringCourseName && `Course: ${recurringCourseName}`,
+      recurringCourseCode && `Code: ${recurringCourseCode}`,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+
     const response = await fetch("/api/recurring-classroom-booking", {
       method: "POST",
       headers: {
@@ -471,8 +491,8 @@ export default function ClassroomsPage() {
         weekday: recurringWeekday,
         startTime: recurringStartTime,
         endTime: recurringEndTime,
-        remark: recurringRemark,
-        email: user?.email,
+        remark,
+        email: bookeeEmail,
       }),
     });
 
@@ -480,6 +500,10 @@ export default function ClassroomsPage() {
     alert(data.message);
 
     setShowRecurringModal(false);
+    setRecurringBookeeEmail("");
+    setRecurringInstructor("");
+    setRecurringCourseName("");
+    setRecurringCourseCode("");
     await loadData();
   }
 
@@ -706,12 +730,45 @@ export default function ClassroomsPage() {
               </div>
             </div>
 
-            <textarea
-              placeholder="Remark / Notes"
-              value={recurringRemark}
-              onChange={(e) => setRecurringRemark(e.target.value)}
-              className="border rounded-lg px-3 py-2 w-full"
-            />
+            <div>
+              <label className="text-sm">Book for email</label>
+              <input
+                value={recurringBookeeEmail}
+                disabled={!isAdmin}
+                onChange={(e) => setRecurringBookeeEmail(e.target.value)}
+                className="border rounded-lg px-3 py-2 w-full disabled:bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm">Instructor</label>
+              <input
+                value={recurringInstructor}
+                onChange={(e) => setRecurringInstructor(e.target.value)}
+                className="border rounded-lg px-3 py-2 w-full"
+                placeholder="Instructor name"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm">Course Name</label>
+              <input
+                value={recurringCourseName}
+                onChange={(e) => setRecurringCourseName(e.target.value)}
+                className="border rounded-lg px-3 py-2 w-full"
+                placeholder="Course name"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm">Course Code</label>
+              <input
+                value={recurringCourseCode}
+                onChange={(e) => setRecurringCourseCode(e.target.value)}
+                className="border rounded-lg px-3 py-2 w-full"
+                placeholder="Course code"
+              />
+            </div>
 
             <div className="flex gap-2 justify-end">
               <button
@@ -786,7 +843,10 @@ export default function ClassroomsPage() {
 
 
             <button
-              onClick={() => setShowRecurringModal(true)}
+              onClick={() => {
+                setRecurringBookeeEmail(user?.email || "");
+                setShowRecurringModal(true);
+              }}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Recurring Classroom
