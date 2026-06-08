@@ -4,12 +4,29 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
+type Role = {
+  email: string;
+  role: "admin" | "instructor";
+};
+
+const backupAdminEmails = [
+  "hh3144@tc.columbia.edu",
+  "jcg21@tc.columbia.edu",
+  "instruments@tc.columbia.edu",
+  "ma3412@tc.columbia.edu",
+];
+
 export default function HomePage() {
   const [user, setUser] = useState<User | null>(null);
+  const [roles, setRoles] = useState<Role[]>([]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       setUser(data.user);
+    });
+
+    supabase.from("user_roles").select("*").then(({ data }) => {
+      setRoles(data || []);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
@@ -32,6 +49,17 @@ export default function HomePage() {
     await supabase.auth.signOut();
     setUser(null);
   }
+
+  const currentRole = user?.email
+    ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
+    : undefined;
+
+  const isAdmin =
+    currentRole === "admin" ||
+    (user?.email ? backupAdminEmails.includes(user.email.toLowerCase()) : false);
+
+  const isInstructor = currentRole === "instructor";
+  const canSeeClassrooms = isAdmin || isInstructor;
 
   function goTo(path: string) {
     if (!user) {
@@ -91,15 +119,17 @@ export default function HomePage() {
               </p>
             </button>
 
-            <button
-              onClick={() => goTo("/classrooms")}
-              className="border rounded-2xl p-8 text-left hover:bg-gray-50 hover:shadow-md transition"
-            >
-              <h2 className="text-2xl font-bold mb-3">Classrooms</h2>
-              <p className="text-gray-600">
-                Reserve classrooms for teaching, rehearsals, and events.
-              </p>
-            </button>
+            {canSeeClassrooms && (
+              <button
+                onClick={() => goTo("/classrooms")}
+                className="border rounded-2xl p-8 text-left hover:bg-gray-50 hover:shadow-md transition"
+              >
+                <h2 className="text-2xl font-bold mb-3">Classrooms</h2>
+                <p className="text-gray-600">
+                  Reserve classrooms for teaching, rehearsals, and events.
+                </p>
+              </button>
+            )}
 
             <button
               onClick={() => goTo("/equipment")}
