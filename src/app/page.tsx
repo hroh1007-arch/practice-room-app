@@ -72,6 +72,15 @@ export default function HomePage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
+      {user && isAdmin && (
+        <button
+          onClick={() => (window.location.href = "/admin-bookings")}
+          className="fixed right-8 top-8 z-50 border bg-white px-4 py-2 rounded-lg shadow-sm hover:bg-gray-100"
+        >
+          Admin
+        </button>
+      )}
+
       <div className="max-w-6xl w-full">
         <div className="bg-white border rounded-3xl shadow-lg p-10">
           <div className="text-center mb-12">
