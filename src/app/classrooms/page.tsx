@@ -340,6 +340,8 @@ export default function ClassroomsPage() {
   }
 
   async function cancelBooking(id: string, ownerEmail?: string) {
+    const bookingToCancel = myBookings.find((booking) => booking.id === id) || adminBookings.find((booking) => booking.id === id);
+
     if (!isAdmin && ownerEmail && ownerEmail !== user?.email) {
       alert("You can only cancel your own classroom booking.");
       return;
@@ -353,6 +355,21 @@ export default function ClassroomsPage() {
     if (error) {
       alert(error.message);
       return;
+    }
+
+    if (bookingToCancel) {
+      await fetch("/api/send-booking-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "cancel",
+          email: bookingToCancel.user_email,
+          room: classroomName(bookingToCancel.classroom_id),
+          date: bookingToCancel.booking_date,
+          startTime: cleanTime(bookingToCancel.start_time),
+          endTime: cleanTime(bookingToCancel.end_time),
+        }),
+      });
     }
 
     await loadData();
