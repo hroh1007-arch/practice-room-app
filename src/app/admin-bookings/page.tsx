@@ -347,7 +347,7 @@ export default function AdminBookingsPage() {
           <button onClick={() => (window.location.href = "/equipment")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Equipment</button>
             
             <button
-              onClick={() => { localStorage.setItem("practiceAdminView", "roles"); window.location.href = "/admin-suspensions"; }}
+              onClick={() => (window.location.href = "/admin-roles")}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
               Manage Roles
