@@ -211,13 +211,23 @@ export default function EquipmentPage() {
     ])
   );
 
-  const shownActive = checkouts
+  const userUni = uniFromEmail(user?.email).toLowerCase();
+
+  const visibleCheckouts = isAdmin
+    ? checkouts
+    : checkouts.filter(
+        (c) =>
+          c.email?.toLowerCase() === user?.email?.toLowerCase() ||
+          c.uni?.toLowerCase() === userUni
+      );
+
+  const shownActive = visibleCheckouts
     .filter((c) => !c.returned)
     .filter((c) =>
       match([c.equipment_code, c.renter_name, c.uni, c.email, c.instructor, c.checkout_date, c.return_date, c.notes])
     );
 
-  const shownReturned = checkouts
+  const shownReturned = visibleCheckouts
     .filter((c) => c.returned)
     .filter((c) =>
       match([c.equipment_code, c.renter_name, c.uni, c.email, c.instructor, c.checkout_date, c.return_date, c.actual_return_date, c.notes])
@@ -701,7 +711,7 @@ export default function EquipmentPage() {
           <div className="mb-8">
             <h1 className="text-5xl font-bold text-gray-900">Equipment Inventory</h1>
             <p className="text-gray-600 mt-2">
-              Inventory: {items.length} items · Active Renting: {checkouts.filter((c) => !c.returned).length} · Returned: {checkouts.filter((c) => c.returned).length} · Requests: {requests.length}
+              Inventory: {items.length} items · Active Renting: {shownActive.length} · Returned: {shownReturned.length} · Requests: {requests.length}
             </p>
           </div>
 
