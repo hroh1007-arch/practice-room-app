@@ -55,6 +55,22 @@ type Role = {
   role: "admin" | "instructor";
 };
 
+
+function displayNameFromUser(user: any) {
+  return (
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "there"
+  );
+}
+
+function displayPerson(name?: string | null, email?: string | null) {
+  const uni = email ? email.split("@")[0] : "";
+  if (name && uni) return `${name} (${uni})`;
+  return name || uni || "Unknown";
+}
+
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
   "jcg21@tc.columbia.edu",
@@ -736,7 +752,7 @@ export default function EquipmentPage() {
             )}
 
             <span className="text-gray-700">
-              Logged in as <strong>{user.email}</strong>{isAdmin && <span> · admin</span>}
+              Hello <strong>{displayNameFromUser(user)}</strong> · Logged in as <strong>{user.email}</strong>{isAdmin && <span> · admin</span>}
             </span>
 
             <button onClick={logout} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Log out</button>
