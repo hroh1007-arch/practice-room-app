@@ -876,7 +876,7 @@ export default function ClassroomsPage() {
                                   : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
                               }
                             >
-                              {booking
+                              {booking && cleanTime(booking.start_time) === time
                                 ? [booking.user_email.split("@")[0], booking.remark]
                                     .filter(Boolean)
                                     .join(" · ")
