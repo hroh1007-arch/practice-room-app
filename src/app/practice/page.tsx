@@ -1035,19 +1035,25 @@ export default function Home() {
           <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border flex gap-4 items-center flex-wrap">
             {user ? (
               <>
-                <span className="text-gray-700">
-                  Logged in as <strong>{user.email}</strong>
-                  {isAdmin && <span> · admin</span>}
-                  {!isAdmin && isInstructor && <span> · instructor</span>}
-                </span>
-
-                
-
                 <button
-                  onClick={() => (window.location.href = "/my-bookings")}
+                  onClick={() => (window.location.href = "/")}
                   className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                 >
-                  My Bookings
+                  Main Menu
+                </button>
+
+                <button
+                  onClick={() => (window.location.href = "/practice")}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  Practice Rooms
+                </button>
+
+                <button
+                  onClick={() => (window.location.href = "/classrooms")}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  Classrooms
                 </button>
 
                 <button
@@ -1058,36 +1064,35 @@ export default function Home() {
                 </button>
 
                 {hasUnlimitedBooking && (
-                  <>
-                    <button
-                      onClick={() => setShowRecurringModal(true)}
-                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                    >
-                      Recurring Booking
-                    </button>
-
-                    <button
-                      onClick={() => (window.location.href = "/classrooms")}
-                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                    >
-                      Classrooms
-                    </button>
-                  </>
+                  <button
+                    onClick={() => setShowRecurringModal(true)}
+                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                  >
+                    Recurring
+                  </button>
                 )}
+
+                <button
+                  onClick={() => (window.location.href = "/my-bookings")}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  My Bookings
+                </button>
 
                 {isAdmin && (
-                  <>
-                    <button
-                      onClick={() => (window.location.href = "/admin-bookings")}
-                      className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                    >
-                      Admin
-                    </button>
-
-                    
-
-                  </>
+                  <button
+                    onClick={() => (window.location.href = "/admin-bookings")}
+                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                  >
+                    Admin
+                  </button>
                 )}
+
+                <span className="text-gray-700">
+                  Logged in as <strong>{user.email}</strong>
+                  {isAdmin && <span> · admin</span>}
+                  {!isAdmin && isInstructor && <span> · instructor</span>}
+                </span>
 
                 <button
                   onClick={logout}
