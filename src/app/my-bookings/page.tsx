@@ -11,6 +11,7 @@ type PracticeBooking = {
   start_time: string;
   end_time: string;
   user_email: string;
+  user_name?: string | null;
   remark?: string | null;
   recurring_series_id?: string | null;
 };
@@ -22,6 +23,7 @@ type ClassroomBooking = {
   start_time: string;
   end_time: string;
   user_email: string;
+  user_name?: string | null;
   remark?: string | null;
   recurring_series_id?: string | null;
 };
@@ -62,6 +64,22 @@ type Role = {
   email: string;
   role: "admin" | "instructor";
 };
+
+
+function displayNameFromUser(user: any) {
+  return (
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "there"
+  );
+}
+
+function displayPerson(name?: string | null, email?: string | null) {
+  const uni = email ? email.split("@")[0] : "";
+  if (name && uni) return `${name} (${uni})`;
+  return name || uni || "Unknown";
+}
 
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
@@ -301,7 +319,7 @@ export default function MyBookingsPage() {
           </button>
 
           <span className="text-gray-700 ml-auto">
-            Logged in as <strong>{user.email}</strong>
+            Hello <strong>{displayNameFromUser(user)}</strong> · Logged in as <strong>{user.email}</strong>
           </span>
         </div>
 
