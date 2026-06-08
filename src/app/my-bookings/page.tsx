@@ -58,6 +58,18 @@ type Room = {
   room_number: string;
 };
 
+type Role = {
+  email: string;
+  role: "admin" | "instructor";
+};
+
+const backupAdminEmails = [
+  "hh3144@tc.columbia.edu",
+  "jcg21@tc.columbia.edu",
+  "instruments@tc.columbia.edu",
+  "ma3412@tc.columbia.edu",
+];
+
 function today() {
   return new Date().toISOString().split("T")[0];
 }
@@ -88,6 +100,7 @@ export default function MyBookingsPage() {
 
   const [rooms, setRooms] = useState<Room[]>([]);
   const [classrooms, setClassrooms] = useState<Room[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
 
   const [practiceBookings, setPracticeBookings] = useState<PracticeBooking[]>([]);
   const [classroomBookings, setClassroomBookings] = useState<ClassroomBooking[]>([]);
@@ -96,6 +109,9 @@ export default function MyBookingsPage() {
 
   async function loadData(currentUser?: User | null) {
     const activeUser = currentUser || user;
+
+    const { data: roleData } = await supabase.from("user_roles").select("*");
+    setRoles(roleData || []);
 
     const { data: roomData } = await supabase
       .from("practice_rooms")
@@ -161,6 +177,17 @@ export default function MyBookingsPage() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  const currentRole = user?.email
+    ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
+    : undefined;
+
+  const isAdmin =
+    currentRole === "admin" ||
+    (user?.email ? backupAdminEmails.includes(user.email.toLowerCase()) : false);
+
+  const isInstructor = currentRole === "instructor";
+  const canSeeClassrooms = isAdmin || isInstructor;
 
   async function login() {
     await supabase.auth.signInWithOAuth({
@@ -257,12 +284,14 @@ export default function MyBookingsPage() {
             Practice Rooms
           </button>
 
-          <button
-            onClick={() => (window.location.href = "/classrooms")}
-            className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-          >
-            Classrooms
-          </button>
+          {canSeeClassrooms && (
+            <button
+              onClick={() => (window.location.href = "/classrooms")}
+              className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+            >
+              Classrooms
+            </button>
+          )}
 
           <button
             onClick={() => (window.location.href = "/equipment")}
