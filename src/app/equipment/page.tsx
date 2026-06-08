@@ -725,6 +725,15 @@ export default function EquipmentPage() {
       )}
 
       <main className="min-h-screen bg-gray-100 p-8">
+        {isAdmin && (
+          <button
+            onClick={() => (window.location.href = "/admin-bookings")}
+            className="fixed right-8 top-8 z-50 border bg-white px-4 py-2 rounded-lg shadow-sm hover:bg-gray-100"
+          >
+            Admin
+          </button>
+        )}
+
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
             <h1 className="text-5xl font-bold text-gray-900">Equipment Inventory</h1>
@@ -742,10 +751,6 @@ export default function EquipmentPage() {
             <button onClick={() => setView("inventory")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Inventory</button>
             <button onClick={() => setView("active")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">{isAdmin ? "Active Renting" : "My Rentals"}</button>
             <button onClick={() => setView("returned")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">{isAdmin ? "Returned" : "History"}</button>
-            {isAdmin && (
-              <button onClick={() => (window.location.href = "/admin-bookings")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Admin</button>
-            )}
-
             {isAdmin && (
               <>
                 {isAdmin && <button onClick={() => setView("requests")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Requests</button>}
