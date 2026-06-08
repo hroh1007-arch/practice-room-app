@@ -1044,7 +1044,7 @@ export default function Home() {
                 
 
                 <button
-                  onClick={() => setView("myBookings")}
+                  onClick={() => (window.location.href = "/my-bookings")}
                   className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                 >
                   My Bookings
