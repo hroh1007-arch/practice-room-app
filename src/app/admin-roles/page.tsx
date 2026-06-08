@@ -292,7 +292,65 @@ export default function AdminRolesPage() {
           </div>
         </section>
 
+        <section className="bg-white rounded-2xl shadow-lg border overflow-x-auto mb-8">
+          <div className="p-5 border-b">
+            <h2 className="text-2xl font-bold">Admins</h2>
+          </div>
+
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="p-3 border text-left">Email</th>
+                <th className="p-3 border text-left">Role</th>
+                <th className="p-3 border text-left">Actions</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {roles.filter((row) => row.role === "admin").map((row) => (
+                <tr key={row.email}>
+                  <td className="p-3 border">{row.email}</td>
+
+                  <td className="p-3 border">
+                    <select
+                      value={row.role}
+                      onChange={(e) =>
+                        changeRole(row, e.target.value as "admin" | "instructor")
+                      }
+                      className="border rounded-lg px-3 py-2"
+                    >
+                      <option value="admin">Admin</option>
+                      <option value="instructor">Instructor</option>
+                    </select>
+                  </td>
+
+                  <td className="p-3 border">
+                    <button
+                      onClick={() => removeRole(row)}
+                      className="bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-700"
+                    >
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+
+              {roles.filter((row) => row.role === "admin").length === 0 && (
+                <tr>
+                  <td className="p-6 text-gray-500" colSpan={3}>
+                    No admins found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+
         <section className="bg-white rounded-2xl shadow-lg border overflow-x-auto">
+          <div className="p-5 border-b">
+            <h2 className="text-2xl font-bold">Instructors</h2>
+          </div>
+
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-gray-50">
@@ -304,7 +362,7 @@ export default function AdminRolesPage() {
             </thead>
 
             <tbody>
-              {roles.map((row) => (
+              {roles.filter((row) => row.role === "instructor").map((row) => (
                 <tr key={row.email}>
                   <td className="p-3 border">{row.email}</td>
 
@@ -322,18 +380,14 @@ export default function AdminRolesPage() {
                   </td>
 
                   <td className="p-3 border">
-                    {row.role === "instructor" ? (
-                      <button
-                        onClick={() => saveHourLimit(row)}
-                        className="border px-3 py-1 rounded hover:bg-gray-100"
-                      >
-                        {hourLimitFor(row.email) === undefined
-                          ? "Set Hour Limit"
-                          : `${hourLimitFor(row.email)} hrs/week`}
-                      </button>
-                    ) : (
-                      <span className="text-gray-500">Admin unlimited</span>
-                    )}
+                    <button
+                      onClick={() => saveHourLimit(row)}
+                      className="border px-3 py-1 rounded hover:bg-gray-100"
+                    >
+                      {hourLimitFor(row.email) === undefined
+                        ? "Set Hour Limit"
+                        : `${hourLimitFor(row.email)} hrs/week`}
+                    </button>
                   </td>
 
                   <td className="p-3 border">
@@ -347,10 +401,10 @@ export default function AdminRolesPage() {
                 </tr>
               ))}
 
-              {roles.length === 0 && (
+              {roles.filter((row) => row.role === "instructor").length === 0 && (
                 <tr>
                   <td className="p-6 text-gray-500" colSpan={4}>
-                    No roles found.
+                    No instructors found.
                   </td>
                 </tr>
               )}
