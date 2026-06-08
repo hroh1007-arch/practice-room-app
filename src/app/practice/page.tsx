@@ -382,6 +382,10 @@ export default function Home() {
 
     const end = cellEnd(hoverTime);
 
+    if (!hasUnlimitedBooking && minutesBetween(selection.start, end) > 120) {
+      return false;
+    }
+
     return (
       timeToMinutes(time) >= timeToMinutes(selection.start) &&
       timeToMinutes(time) < timeToMinutes(end)
@@ -1231,6 +1235,12 @@ export default function Home() {
                                 disabled={past || isPastDate(date)}
                                 onMouseEnter={() => {
                                   if (selection?.room.id === room.id) {
+                                    const previewEnd = cellEnd(time);
+
+                                    if (!hasUnlimitedBooking && minutesBetween(selection.start, previewEnd) > 120) {
+                                      return;
+                                    }
+
                                     setHoverTime(time);
                                   }
                                 }}
