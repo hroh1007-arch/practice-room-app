@@ -1189,7 +1189,7 @@ export default function Home() {
                               onClick={() => handleCellClick(room, time)}
                               className={
                                 booked
-                                  ? "bg-gray-300 text-gray-700 w-full h-8 cursor-not-allowed border border-gray-300 text-xs"
+                                  ? "bg-gray-300 text-gray-700 w-full h-8 cursor-not-allowed border border-gray-300 text-xs overflow-hidden whitespace-nowrap px-1"
                                   : past || isPastDate(date)
                                   ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 text-xs"
                                   : preview
@@ -1197,7 +1197,11 @@ export default function Home() {
                                   : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
                               }
                             >
-                              {booking ? uniFromEmail(booking.user_email) : ""}
+                              {booking
+                                ? [uniFromEmail(booking.user_email), booking.remark]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                : ""}
                             </button>
                           </td>
                         );
