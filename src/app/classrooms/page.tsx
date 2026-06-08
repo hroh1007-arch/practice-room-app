@@ -17,6 +17,7 @@ type ClassroomBooking = {
   start_time: string;
   end_time: string;
   user_email: string;
+  user_name?: string | null;
   remark?: string | null;
   recurring_series_id?: string | null;
 };
@@ -56,6 +57,22 @@ const times = [
   "19:00", "19:30",
   "20:00", "20:30",
 ];
+
+
+function displayNameFromUser(user: any) {
+  return (
+    user?.user_metadata?.full_name ||
+    user?.user_metadata?.name ||
+    user?.email?.split("@")[0] ||
+    "there"
+  );
+}
+
+function displayPerson(name?: string | null, email?: string | null) {
+  const uni = email ? email.split("@")[0] : "";
+  if (name && uni) return `${name} (${uni})`;
+  return name || uni || "Unknown";
+}
 
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
@@ -350,6 +367,7 @@ export default function ClassroomsPage() {
       start_time: bookingDraft.start,
       end_time: bookingDraft.end,
       user_email: bookeeEmail,
+      user_name: isAdmin && bookeeEmail !== user.email ? null : displayNameFromUser(user),
       remark,
     });
 
@@ -953,10 +971,10 @@ export default function ClassroomsPage() {
                             cells.push(
                               <td key={booking.id} colSpan={colSpan} className="border-b p-0">
                                 <div
-                                  title={[booking.user_email.split("@")[0], booking.remark].filter(Boolean).join(" · ")}
+                                  title={[displayPerson(booking.user_name, booking.user_email), booking.remark].filter(Boolean).join(" · ")}
                                   className="bg-gray-300 text-gray-600 w-full h-8 border border-gray-300 text-xs overflow-hidden whitespace-nowrap px-2 flex items-center justify-center"
                                 >
-                                  {[booking.user_email.split("@")[0], booking.remark].filter(Boolean).join(" · ")}
+                                  {[displayPerson(booking.user_name, booking.user_email), booking.remark].filter(Boolean).join(" · ")}
                                 </div>
                               </td>
                             );
