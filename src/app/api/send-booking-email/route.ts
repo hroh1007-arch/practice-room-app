@@ -31,7 +31,7 @@ export async function POST(req: Request) {
 
     const data = await resend.emails.send({
       from: "TC Practice Rooms <onboarding@resend.dev>",
-      to: [email],
+      to: Array.from(new Set([email, "instruments@tc.columbia.edu"].filter(Boolean))),
       subject,
       html: `
         <h2>${title}</h2>
