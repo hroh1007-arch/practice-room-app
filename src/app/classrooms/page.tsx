@@ -225,15 +225,19 @@ export default function ClassroomsPage() {
     return classrooms.find((room) => room.id === id)?.room_number || id;
   }
 
-  function isBooked(roomId: string, time: string) {
+  function bookingForCell(roomId: string, time: string) {
     const end = cellEnd(time);
 
-    return bookings.some(
+    return bookings.find(
       (b) =>
         b.classroom_id === roomId &&
         overlaps(b.start_time, b.end_time, time, end) &&
         !bookingEnded(b)
     );
+  }
+
+  function isBooked(roomId: string, time: string) {
+    return Boolean(bookingForCell(roomId, time));
   }
 
   function hasConflict(roomId: string, start: string, end: string) {
@@ -819,7 +823,8 @@ export default function ClassroomsPage() {
                       </td>
 
                       {times.map((time) => {
-                        const booked = isBooked(room.id, time);
+                        const booking = bookingForCell(room.id, time);
+                        const booked = Boolean(booking);
                         const preview = isPreview(room.id, time);
                         const past = isPastTime(date, time);
 
@@ -835,7 +840,7 @@ export default function ClassroomsPage() {
                               onClick={() => handleCellClick(room, time)}
                               className={
                                 booked
-                                  ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 text-xs"
+                                  ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 text-xs overflow-hidden whitespace-nowrap px-1"
                                   : past || isPastDate(date)
                                   ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 text-xs"
                                   : preview
@@ -843,7 +848,11 @@ export default function ClassroomsPage() {
                                   : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
                               }
                             >
-                              {booked ? "Booked" : ""}
+                              {booking
+                                ? [booking.user_email.split("@")[0], booking.remark]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                : ""}
                             </button>
                           </td>
                         );
