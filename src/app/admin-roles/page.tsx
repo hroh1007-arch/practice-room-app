@@ -14,6 +14,12 @@ type InstructorHourLimit = {
   weekly_hour_limit: number;
 };
 
+type AuthorizedUser = {
+  id?: string;
+  email: string;
+  note?: string | null;
+};
+
 const backupAdminEmails = [
   "hh3144@tc.columbia.edu",
   "jcg21@tc.columbia.edu",
@@ -25,6 +31,9 @@ export default function AdminRolesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [roles, setRoles] = useState<RoleRow[]>([]);
   const [hourLimits, setHourLimits] = useState<InstructorHourLimit[]>([]);
+  const [authorizedUsers, setAuthorizedUsers] = useState<AuthorizedUser[]>([]);
+  const [authorizedEmail, setAuthorizedEmail] = useState("");
+  const [authorizedNote, setAuthorizedNote] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<"admin" | "instructor">("instructor");
 
@@ -60,6 +69,18 @@ export default function AdminRolesPage() {
     }
 
     setHourLimits((limitData || []) as InstructorHourLimit[]);
+
+    const { data: authorizedData, error: authorizedError } = await supabase
+      .from("authorized_users")
+      .select("id, email, note")
+      .order("email", { ascending: true });
+
+    if (authorizedError) {
+      alert(authorizedError.message);
+      return;
+    }
+
+    setAuthorizedUsers((authorizedData || []) as AuthorizedUser[]);
   }
 
   useEffect(() => {
@@ -151,6 +172,48 @@ export default function AdminRolesPage() {
       },
       { onConflict: "instructor_email" }
     );
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    await loadData();
+  }
+
+  async function saveAuthorizedUser() {
+    const cleanEmail = authorizedEmail.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      alert("Enter an email.");
+      return;
+    }
+
+    const { error } = await supabase.from("authorized_users").upsert(
+      {
+        email: cleanEmail,
+        note: authorizedNote.trim() || null,
+      },
+      { onConflict: "email" }
+    );
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setAuthorizedEmail("");
+    setAuthorizedNote("");
+    await loadData();
+  }
+
+  async function removeAuthorizedUser(row: AuthorizedUser) {
+    if (!confirm(`Remove authorized access for ${row.email}?`)) return;
+
+    const { error } = await supabase
+      .from("authorized_users")
+      .delete()
+      .eq("email", row.email);
 
     if (error) {
       alert(error.message);
@@ -289,6 +352,58 @@ export default function AdminRolesPage() {
             >
               Save Role
             </button>
+          </div>
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-lg border p-6 mb-8">
+          <h2 className="text-2xl font-bold mb-4">Authorized Outside Users</h2>
+
+          <div className="flex gap-3 flex-wrap mb-6">
+            <input
+              value={authorizedEmail}
+              onChange={(e) => setAuthorizedEmail(e.target.value)}
+              placeholder="outside.user@example.com"
+              className="border rounded-lg px-4 py-2 flex-1 min-w-[260px]"
+            />
+
+            <input
+              value={authorizedNote}
+              onChange={(e) => setAuthorizedNote(e.target.value)}
+              placeholder="Note"
+              className="border rounded-lg px-4 py-2 flex-1 min-w-[220px]"
+            />
+
+            <button
+              onClick={saveAuthorizedUser}
+              className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+            >
+              Add Authorized User
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            {authorizedUsers.length === 0 && (
+              <p className="text-gray-600">No outside users authorized.</p>
+            )}
+
+            {authorizedUsers.map((row) => (
+              <div
+                key={row.email}
+                className="border rounded-xl p-4 flex items-center justify-between gap-4"
+              >
+                <div>
+                  <p className="font-semibold">{row.email}</p>
+                  {row.note && <p className="text-gray-600 text-sm">{row.note}</p>}
+                </div>
+
+                <button
+                  onClick={() => removeAuthorizedUser(row)}
+                  className="bg-gray-900 text-white px-3 py-1 rounded hover:bg-gray-700"
+                >
+                  Remove
+                </button>
+              </div>
+            ))}
           </div>
         </section>
 
