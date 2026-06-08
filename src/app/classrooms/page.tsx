@@ -299,9 +299,18 @@ export default function ClassroomsPage() {
       return;
     }
 
+    const bookeeEmail = isAdmin
+      ? (window.prompt("Book for which email?", user.email || "") || user.email || "").trim().toLowerCase()
+      : user.email;
+
+    if (!bookeeEmail) {
+      alert("Bookee email is required.");
+      return;
+    }
+
     const remark = window.prompt("Optional note/remark for this classroom booking:", "") || "";
 
-    const confirmed = window.confirm(`Book classroom ${room.room_number} from ${start} to ${end}?`);
+    const confirmed = window.confirm(`Book classroom ${room.room_number} from ${start} to ${end} for ${bookeeEmail}?`);
     if (!confirmed) return;
 
     const { error } = await supabase.from("classroom_bookings").insert({
@@ -309,7 +318,7 @@ export default function ClassroomsPage() {
       booking_date: date,
       start_time: start,
       end_time: end,
-      user_email: user.email,
+      user_email: bookeeEmail,
       remark,
     });
 
@@ -329,7 +338,7 @@ export default function ClassroomsPage() {
       },
       body: JSON.stringify({
         type: "confirm",
-        email: user.email,
+        email: bookeeEmail,
         room: room.room_number,
         date: date,
         startTime: start,
