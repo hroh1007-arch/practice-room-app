@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -84,6 +84,10 @@ function minutesToTime(total: number) {
 
 function cellEnd(time: string) {
   return minutesToTime(timeToMinutes(time) + 30);
+}
+
+function minutesBetween(start: string, end: string) {
+  return timeToMinutes(end) - timeToMinutes(start);
 }
 
 function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
@@ -910,41 +914,66 @@ export default function ClassroomsPage() {
                         )}
                       </td>
 
-                      {times.map((time) => {
-                        const booking = bookingForCell(room.id, time);
-                        const booked = Boolean(booking);
-                        const preview = isPreview(room.id, time);
-                        const past = isPastTime(date, time);
+                      {(() => {
+                        const cells: ReactNode[] = [];
 
-                        return (
-                          <td key={time} className="border-b p-0">
-                            <button
-                              disabled={booked || past || isPastDate(date)}
-                              onMouseEnter={() => {
-                                if (selection?.room.id === room.id) {
-                                  setHoverTime(time);
+                        for (let index = 0; index < times.length; index++) {
+                          const time = times[index];
+                          const booking = bookingForCell(room.id, time);
+                          const preview = isPreview(room.id, time);
+                          const past = isPastTime(date, time);
+
+                          if (booking) {
+                            if (cleanTime(booking.start_time) !== time) {
+                              continue;
+                            }
+
+                            const colSpan = Math.max(
+                              1,
+                              Math.min(
+                                Math.ceil(minutesBetween(booking.start_time, booking.end_time) / 30),
+                                times.length - index
+                              )
+                            );
+
+                            cells.push(
+                              <td key={booking.id} colSpan={colSpan} className="border-b p-0">
+                                <div
+                                  title={[booking.user_email.split("@")[0], booking.remark].filter(Boolean).join(" · ")}
+                                  className="bg-gray-300 text-gray-600 w-full h-8 border border-gray-300 text-xs overflow-hidden whitespace-nowrap px-2 flex items-center justify-center"
+                                >
+                                  {[booking.user_email.split("@")[0], booking.remark].filter(Boolean).join(" · ")}
+                                </div>
+                              </td>
+                            );
+
+                            continue;
+                          }
+
+                          cells.push(
+                            <td key={time} className="border-b p-0">
+                              <button
+                                disabled={past || isPastDate(date)}
+                                onMouseEnter={() => {
+                                  if (selection?.room.id === room.id) {
+                                    setHoverTime(time);
+                                  }
+                                }}
+                                onClick={() => handleCellClick(room, time)}
+                                className={
+                                  past || isPastDate(date)
+                                    ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 text-xs"
+                                    : preview
+                                    ? "bg-gray-200 w-full h-8 border border-gray-300 text-xs"
+                                    : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
                                 }
-                              }}
-                              onClick={() => handleCellClick(room, time)}
-                              className={
-                                booked
-                                  ? "bg-gray-300 text-gray-600 w-full h-8 cursor-not-allowed border border-gray-300 text-xs overflow-hidden whitespace-nowrap px-1"
-                                  : past || isPastDate(date)
-                                  ? "bg-gray-100 text-gray-400 w-full h-8 cursor-not-allowed border border-gray-200 text-xs"
-                                  : preview
-                                  ? "bg-gray-200 w-full h-8 border border-gray-300 text-xs"
-                                  : "bg-white hover:bg-gray-100 w-full h-8 border border-gray-300 text-xs"
-                              }
-                            >
-                              {booking && cleanTime(booking.start_time) === time
-                                ? [booking.user_email.split("@")[0], booking.remark]
-                                    .filter(Boolean)
-                                    .join(" · ")
-                                : ""}
-                            </button>
-                          </td>
-                        );
-                      })}
+                              />
+                            </td>
+                          );
+                        }
+
+                        return cells;
+                      })()}
                     </tr>
                   ))}
                 </tbody>
