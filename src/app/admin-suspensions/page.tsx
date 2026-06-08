@@ -169,6 +169,13 @@ export default function AdminSuspensionsPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
+      <button
+        onClick={() => (window.location.href = "/admin-bookings")}
+        className="fixed right-8 top-8 z-50 border bg-white px-4 py-2 rounded-lg shadow-sm hover:bg-gray-100"
+      >
+        Admin
+      </button>
+
       <div className="max-w-6xl mx-auto">
         <h1 className="text-5xl font-bold mb-2">Suspensions</h1>
         <p className="text-gray-600 mb-8">
@@ -176,13 +183,6 @@ export default function AdminSuspensionsPage() {
         </p>
 
         <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border flex gap-4 flex-wrap">
-          <button
-            onClick={() => (window.location.href = "/admin-bookings")}
-            className="border px-4 py-2 rounded-lg"
-          >
-            Admin Bookings
-          </button>
-
           <button
             onClick={() => (window.location.href = "/admin-roles")}
             className="border px-4 py-2 rounded-lg"
