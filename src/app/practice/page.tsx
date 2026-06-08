@@ -36,6 +36,10 @@ type Suspension = {
   ends_at?: string | null;
 };
 
+type InstructorHourLimit = {
+  weekly_hour_limit: number;
+};
+
 type Selection = {
   room: Room;
   start: string;
@@ -171,6 +175,7 @@ export default function Home() {
   const [adminBookings, setAdminBookings] = useState<Booking[]>([]);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [suspensions, setSuspensions] = useState<Suspension[]>([]);
+  const [instructorHourLimit, setInstructorHourLimit] = useState<number | null>(null);
 
   const [newRoleEmail, setNewRoleEmail] = useState("");
   const [newRoleType, setNewRoleType] = useState<"admin" | "instructor">("instructor");
@@ -217,6 +222,18 @@ export default function Home() {
       .order("email", { ascending: true });
 
     setSuspensions(suspensionData || []);
+
+    if (user?.email) {
+      const { data: limitData } = await supabase
+        .from("instructor_hour_limits")
+        .select("weekly_hour_limit")
+        .eq("instructor_email", user.email.toLowerCase())
+        .maybeSingle();
+
+      setInstructorHourLimit(limitData?.weekly_hour_limit ?? null);
+    } else {
+      setInstructorHourLimit(null);
+    }
 
     const { data: roomData } = await supabase
       .from("practice_rooms")
@@ -390,6 +407,39 @@ export default function Home() {
     return true;
   }
 
+  async function checkInstructorWeeklyLimit(durationMinutes: number) {
+    if (!user?.email || !isInstructor || isAdmin || instructorHourLimit === null) {
+      return true;
+    }
+
+    const { start, end } = getWeekRange(date);
+
+    const { data: weeklyBookings } = await supabase
+      .from("bookings")
+      .select("*")
+      .eq("user_email", user.email)
+      .gte("booking_date", start)
+      .lte("booking_date", end);
+
+    const usedMinutes =
+      weeklyBookings?.reduce((total, booking) => {
+        if (bookingEnded(booking)) return total;
+        return total + minutesBetween(booking.start_time, booking.end_time);
+      }, 0) || 0;
+
+    const allowedMinutes = instructorHourLimit * 60;
+
+    if (usedMinutes + durationMinutes > allowedMinutes) {
+      const remaining = Math.max(0, allowedMinutes - usedMinutes) / 60;
+      alert(
+        `This booking exceeds your instructor weekly limit. You have ${remaining} hour(s) remaining this week.`
+      );
+      return false;
+    }
+
+    return true;
+  }
+
   async function checkWeeklyLimit(durationMinutes: number) {
     if (!user?.email) return false;
 
@@ -495,6 +545,15 @@ export default function Home() {
 
       const weeklyOk = await checkWeeklyLimit(duration);
       if (!weeklyOk) {
+        setSelection(null);
+        setHoverTime(null);
+        return;
+      }
+    }
+
+    if (isInstructor && !isAdmin) {
+      const instructorWeeklyOk = await checkInstructorWeeklyLimit(duration);
+      if (!instructorWeeklyOk) {
         setSelection(null);
         setHoverTime(null);
         return;
