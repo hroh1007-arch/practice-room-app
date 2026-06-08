@@ -45,6 +45,14 @@ type Selection = {
   start: string;
 } | null;
 
+type BookingDraft = {
+  room: Room;
+  start: string;
+  end: string;
+  bookeeEmail: string;
+  remark: string;
+} | null;
+
 const times = [
   "09:00", "09:30",
   "10:00", "10:30",
@@ -190,6 +198,7 @@ export default function Home() {
 
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
+  const [bookingDraft, setBookingDraft] = useState<BookingDraft>(null);
 
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [recurringRoom, setRecurringRoom] = useState("");
@@ -558,28 +567,35 @@ export default function Home() {
       }
     }
 
-    const bookeeEmail = isAdmin
-      ? (window.prompt("Book for which email?", user.email || "") || user.email || "").trim().toLowerCase()
-      : user.email;
+    setBookingDraft({
+      room,
+      start,
+      end,
+      bookeeEmail: user.email || "",
+      remark: "",
+    });
+  }
+
+  async function confirmBookingDraft() {
+    if (!user || !bookingDraft) return;
+
+    const bookeeEmail = (isAdmin ? bookingDraft.bookeeEmail : user.email || "")
+      .trim()
+      .toLowerCase();
 
     if (!bookeeEmail) {
       alert("Bookee email is required.");
       return;
     }
 
-    const remark = window.prompt("Optional note/remark for this booking:", "") || "";
-
-    const confirmed = window.confirm(`Book ${room.room_number} from ${start} to ${end} for ${bookeeEmail}?`);
-    if (!confirmed) return;
-
     const { error } = await supabase.from("bookings").insert({
-      room_id: room.id,
+      room_id: bookingDraft.room.id,
       booking_date: date,
-      start_time: start,
-      end_time: end,
+      start_time: bookingDraft.start,
+      end_time: bookingDraft.end,
       user_email: bookeeEmail,
       user_id: user.id,
-      remark,
+      remark: bookingDraft.remark,
       checked_in: hasUnlimitedBooking,
       checked_in_at: hasUnlimitedBooking ? new Date().toISOString() : null,
     });
@@ -589,22 +605,23 @@ export default function Home() {
       return;
     }
 
-    setSelection(null);
-    setHoverTime(null);
-    await loadData();
-
     await fetch("/api/send-booking-email", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         type: "confirm",
         email: bookeeEmail,
-        room: room.room_number,
+        room: bookingDraft.room.room_number,
         date,
-        startTime: start,
-        endTime: end,
+        startTime: bookingDraft.start,
+        endTime: bookingDraft.end,
       }),
     });
+
+    setBookingDraft(null);
+    setSelection(null);
+    setHoverTime(null);
+    await loadData();
 
     alert("Booked.");
   }
@@ -842,6 +859,62 @@ export default function Home() {
 
   return (
     <>
+      {bookingDraft && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
+            <h2 className="text-2xl font-bold">Confirm Practice Room Booking</h2>
+
+            <p className="text-gray-600">
+              Room {bookingDraft.room.room_number} · {date} · {bookingDraft.start}-{bookingDraft.end}
+            </p>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Book for email</label>
+              <input
+                value={bookingDraft.bookeeEmail}
+                disabled={!isAdmin}
+                onChange={(e) =>
+                  setBookingDraft({ ...bookingDraft, bookeeEmail: e.target.value })
+                }
+                className="border rounded-lg px-4 py-2 w-full disabled:bg-gray-100"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Note</label>
+              <textarea
+                value={bookingDraft.remark}
+                onChange={(e) =>
+                  setBookingDraft({ ...bookingDraft, remark: e.target.value })
+                }
+                className="border rounded-lg px-4 py-2 w-full"
+                placeholder="Optional note"
+              />
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button
+                onClick={() => {
+                  setBookingDraft(null);
+                  setSelection(null);
+                  setHoverTime(null);
+                }}
+                className="border px-4 py-2 rounded-lg"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={confirmBookingDraft}
+                className="bg-black text-white px-4 py-2 rounded-lg"
+              >
+                Confirm Booking
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showRecurringModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
