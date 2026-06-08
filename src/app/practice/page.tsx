@@ -1068,7 +1068,7 @@ export default function Home() {
                     onClick={() => setShowRecurringModal(true)}
                     className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                   >
-                    Recurring
+                    Recurring Bookings
                   </button>
                 )}
 
