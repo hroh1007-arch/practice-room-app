@@ -851,7 +851,7 @@ export default function ClassroomsPage() {
               }}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
-              Recurring
+              Recurring Bookings
             </button>
 
             <button
