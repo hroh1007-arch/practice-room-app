@@ -37,7 +37,9 @@ type BookingDraft = {
   start: string;
   end: string;
   bookeeEmail: string;
-  remark: string;
+  instructor: string;
+  courseName: string;
+  courseCode: string;
 } | null;
 
 const times = [
@@ -317,7 +319,9 @@ export default function ClassroomsPage() {
       start,
       end,
       bookeeEmail: user.email || "",
-      remark: "",
+      instructor: "",
+      courseName: "",
+      courseCode: "",
     });
   }
 
@@ -333,13 +337,21 @@ export default function ClassroomsPage() {
       return;
     }
 
+    const remark = [
+      bookingDraft.instructor && `Instructor: ${bookingDraft.instructor}`,
+      bookingDraft.courseName && `Course: ${bookingDraft.courseName}`,
+      bookingDraft.courseCode && `Code: ${bookingDraft.courseCode}`,
+    ]
+      .filter(Boolean)
+      .join(" / ");
+
     const { error } = await supabase.from("classroom_bookings").insert({
       classroom_id: bookingDraft.room.id,
       booking_date: date,
       start_time: bookingDraft.start,
       end_time: bookingDraft.end,
       user_email: bookeeEmail,
-      remark: bookingDraft.remark,
+      remark,
     });
 
     if (error) {
@@ -575,14 +587,38 @@ export default function ClassroomsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-semibold mb-1">Note</label>
-              <textarea
-                value={bookingDraft.remark}
+              <label className="block text-sm font-semibold mb-1">Instructor</label>
+              <input
+                value={bookingDraft.instructor}
                 onChange={(e) =>
-                  setBookingDraft({ ...bookingDraft, remark: e.target.value })
+                  setBookingDraft({ ...bookingDraft, instructor: e.target.value })
                 }
                 className="border rounded-lg px-4 py-2 w-full"
-                placeholder="Optional note"
+                placeholder="Instructor name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Course Name</label>
+              <input
+                value={bookingDraft.courseName}
+                onChange={(e) =>
+                  setBookingDraft({ ...bookingDraft, courseName: e.target.value })
+                }
+                className="border rounded-lg px-4 py-2 w-full"
+                placeholder="Course name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">Course Code</label>
+              <input
+                value={bookingDraft.courseCode}
+                onChange={(e) =>
+                  setBookingDraft({ ...bookingDraft, courseCode: e.target.value })
+                }
+                className="border rounded-lg px-4 py-2 w-full"
+                placeholder="Course code"
               />
             </div>
 
