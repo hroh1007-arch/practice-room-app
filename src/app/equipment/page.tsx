@@ -613,18 +613,6 @@ export default function EquipmentPage() {
 >
   My Bookings
 </button>
-{isAdmin && (
-  <button
-    onClick={() => (window.location.href = "/admin-bookings")}
-    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-  >
-    Admin
-  </button>
-)}
-
-
-
-
 
           <button onClick={() => (window.location.href = "/practice")} className="border px-5 py-3 rounded-lg hover:bg-gray-100 w-full mt-3">
             Back to Practice Rooms
