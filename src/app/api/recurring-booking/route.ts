@@ -26,6 +26,7 @@ export async function POST(req: Request) {
     endTime,
     remark,
     email,
+    userName,
   } = body;
 
   if (!room || !startDate || !endDate || !weekday || !startTime || !endTime || !email) {
@@ -87,6 +88,7 @@ export async function POST(req: Request) {
       start_time: startTime,
       end_time: endTime,
       user_email: email,
+      user_name: userName || null,
       remark: remark || "",
       checked_in: true,
       recurring_series_id: seriesId,
