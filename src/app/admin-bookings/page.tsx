@@ -418,7 +418,9 @@ export default function AdminBookingsPage() {
                     <p className="text-gray-600">
                       {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
                     </p>
-                    <p className="text-gray-500 text-sm">{displayPerson(booking.user_name, booking.user_email)}</p>
+                    <p className="text-gray-500 text-sm">
+                      Booker: {displayPerson(booking.user_name, booking.user_email)}
+                    </p>
                     {booking.remark && <p className="text-gray-500 text-sm">Remark: {booking.remark}</p>}
                     {booking.recurring_series_id && (
                       <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">Recurring</span>
@@ -451,7 +453,9 @@ export default function AdminBookingsPage() {
                     <p className="text-gray-600">
                       {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
                     </p>
-                    <p className="text-gray-500 text-sm">{displayPerson(booking.user_name, booking.user_email)}</p>
+                    <p className="text-gray-500 text-sm">
+                      Booker: {displayPerson(booking.user_name, booking.user_email)}
+                    </p>
                     {booking.remark && <p className="text-gray-500 text-sm">Remark: {booking.remark}</p>}
                     {booking.recurring_series_id && (
                       <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">Recurring</span>
