@@ -77,7 +77,7 @@ function displayNameFromUser(user: any) {
 
 function displayPerson(name?: string | null, email?: string | null) {
   const uni = email ? email.split("@")[0] : "";
-  if (name && uni) return `${name} (${uni})`;
+  if (name && uni) return `${name} ${uni}`;
   return name || uni || "Unknown";
 }
 
