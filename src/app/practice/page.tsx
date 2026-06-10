@@ -84,7 +84,7 @@ function displayNameFromUser(user: any) {
 
 function displayPerson(name?: string | null, email?: string | null) {
   const uni = email ? email.split("@")[0] : "";
-  if (name && uni) return `${name} (${uni})`;
+  if (name && uni) return `${name} ${uni}`;
   return name || uni || "Unknown";
 }
 
@@ -871,6 +871,7 @@ export default function Home() {
         endTime: recurringEndTime,
         remark: recurringRemark,
         email: user?.email,
+        userName: displayNameFromUser(user),
       }),
     });
 
@@ -1391,7 +1392,7 @@ export default function Home() {
                       </p>
 
                       <p className="text-gray-500 text-sm">
-                        Booker: {displayPerson(booking.user_name, booking.user_email)}
+                        {displayPerson(booking.user_name, booking.user_email)}
                       </p>
 
                       {booking.remark && (
