@@ -27,6 +27,7 @@ export async function POST(req: Request) {
     endTime,
     remark,
     email,
+    userName,
   } = body;
 
   if (
@@ -103,6 +104,7 @@ export async function POST(req: Request) {
         start_time: startTime,
         end_time: endTime,
         user_email: email,
+        user_name: userName || null,
         remark: remark || "",
         recurring_series_id: seriesId,
       });
