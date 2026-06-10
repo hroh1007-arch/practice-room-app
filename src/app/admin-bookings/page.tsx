@@ -64,7 +64,7 @@ function displayNameFromUser(user: any) {
 
 function displayPerson(name?: string | null, email?: string | null) {
   const uni = email ? email.split("@")[0] : "";
-  if (name && uni) return `${name} (${uni})`;
+  if (name && uni) return `${name} ${uni}`;
   return name || uni || "Unknown";
 }
 
@@ -115,6 +115,7 @@ export default function AdminBookingsPage() {
   const [practiceBookings, setPracticeBookings] = useState<PracticeBooking[]>([]);
   const [classroomBookings, setClassroomBookings] = useState<ClassroomBooking[]>([]);
   const [equipmentCheckouts, setEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
+  const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -150,15 +151,18 @@ export default function AdminBookingsPage() {
       .order("booking_date", { ascending: true })
       .order("start_time", { ascending: true });
 
-    setPracticeBookings((practiceData || []).filter((b) => !bookingEnded(b)));
-
     const { data: classroomBookingData } = await supabase
       .from("classroom_bookings")
       .select("*")
       .order("booking_date", { ascending: true })
       .order("start_time", { ascending: true });
 
-    setClassroomBookings((classroomBookingData || []).filter((b) => !bookingEnded(b)));
+    const activePracticeBookings = (practiceData || []).filter((b) => !bookingEnded(b));
+    const activeClassroomBookings = (classroomBookingData || []).filter((b) => !bookingEnded(b));
+
+    setPracticeBookings(activePracticeBookings);
+    setClassroomBookings(activeClassroomBookings);
+    await loadAuthUserNames([...activePracticeBookings, ...activeClassroomBookings]);
 
     const { data: checkoutData } = await supabase
       .from("equipment_checkouts")
@@ -198,6 +202,47 @@ export default function AdminBookingsPage() {
 
   function classroomName(id: string) {
     return classrooms.find((r) => r.id === id)?.room_number || id;
+  }
+
+  function bookingPerson(booking: PracticeBooking | ClassroomBooking) {
+    return displayPerson(
+      booking.user_name || authUserNames[booking.user_email.toLowerCase()],
+      booking.user_email
+    );
+  }
+
+  async function loadAuthUserNames(bookings: Array<PracticeBooking | ClassroomBooking>) {
+    const emails = Array.from(
+      new Set(
+        bookings
+          .map((booking) => booking.user_email)
+          .filter(Boolean)
+          .map((email) => email.toLowerCase())
+      )
+    );
+
+    if (emails.length === 0) return;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    const token = session?.access_token;
+    if (!token) return;
+
+    const response = await fetch("/api/user-display-names", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ emails }),
+    });
+
+    if (!response.ok) return;
+
+    const data = await response.json();
+    setAuthUserNames(data.names || {});
   }
 
   async function cancelPractice(id: string) {
@@ -418,9 +463,7 @@ export default function AdminBookingsPage() {
                     <p className="text-gray-600">
                       {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
                     </p>
-                    <p className="text-gray-500 text-sm">
-                      Booker: {displayPerson(booking.user_name, booking.user_email)}
-                    </p>
+                    <p className="text-gray-500 text-sm">{bookingPerson(booking)}</p>
                     {booking.remark && <p className="text-gray-500 text-sm">Remark: {booking.remark}</p>}
                     {booking.recurring_series_id && (
                       <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">Recurring</span>
@@ -453,9 +496,7 @@ export default function AdminBookingsPage() {
                     <p className="text-gray-600">
                       {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
                     </p>
-                    <p className="text-gray-500 text-sm">
-                      Booker: {displayPerson(booking.user_name, booking.user_email)}
-                    </p>
+                    <p className="text-gray-500 text-sm">{bookingPerson(booking)}</p>
                     {booking.remark && <p className="text-gray-500 text-sm">Remark: {booking.remark}</p>}
                     {booking.recurring_series_id && (
                       <span className="inline-block text-xs bg-gray-200 px-2 py-1 rounded mt-2">Recurring</span>
