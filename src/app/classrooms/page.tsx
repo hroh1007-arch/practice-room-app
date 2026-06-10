@@ -38,6 +38,7 @@ type BookingDraft = {
   start: string;
   end: string;
   bookeeEmail: string;
+  bookeeName: string;
   instructor: string;
   courseName: string;
   courseCode: string;
@@ -335,6 +336,7 @@ export default function ClassroomsPage() {
       start,
       end,
       bookeeEmail: user.email || "",
+      bookeeName: displayNameFromUser(user),
       instructor: "",
       courseName: "",
       courseCode: "",
@@ -347,6 +349,10 @@ export default function ClassroomsPage() {
     const bookeeEmail = (isAdmin ? bookingDraft.bookeeEmail : user.email || "")
       .trim()
       .toLowerCase();
+    const bookeeName =
+      isAdmin && bookeeEmail !== user.email?.toLowerCase()
+        ? bookingDraft.bookeeName.trim()
+        : displayNameFromUser(user);
 
     if (!bookeeEmail) {
       alert("Bookee email is required.");
@@ -367,7 +373,7 @@ export default function ClassroomsPage() {
       start_time: bookingDraft.start,
       end_time: bookingDraft.end,
       user_email: bookeeEmail,
-      user_name: isAdmin && bookeeEmail !== user.email ? null : displayNameFromUser(user),
+      user_name: bookeeName || null,
       remark,
     });
 
@@ -623,6 +629,20 @@ export default function ClassroomsPage() {
                 className="border rounded-lg px-4 py-2 w-full disabled:bg-gray-100"
               />
             </div>
+
+            {isAdmin && (
+              <div>
+                <label className="block text-sm font-semibold mb-1">Book for name</label>
+                <input
+                  value={bookingDraft.bookeeName}
+                  onChange={(e) =>
+                    setBookingDraft({ ...bookingDraft, bookeeName: e.target.value })
+                  }
+                  className="border rounded-lg px-4 py-2 w-full"
+                  placeholder="Student or instructor name"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold mb-1">Instructor</label>
