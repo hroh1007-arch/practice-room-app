@@ -51,6 +51,7 @@ type BookingDraft = {
   start: string;
   end: string;
   bookeeEmail: string;
+  bookeeName: string;
   remark: string;
 } | null;
 
@@ -606,6 +607,7 @@ export default function Home() {
       start,
       end,
       bookeeEmail: user.email || "",
+      bookeeName: displayNameFromUser(user),
       remark: "",
     });
   }
@@ -616,6 +618,10 @@ export default function Home() {
     const bookeeEmail = (isAdmin ? bookingDraft.bookeeEmail : user.email || "")
       .trim()
       .toLowerCase();
+    const bookeeName =
+      isAdmin && bookeeEmail !== user.email?.toLowerCase()
+        ? bookingDraft.bookeeName.trim()
+        : displayNameFromUser(user);
 
     if (!bookeeEmail) {
       alert("Bookee email is required.");
@@ -628,6 +634,7 @@ export default function Home() {
       start_time: bookingDraft.start,
       end_time: bookingDraft.end,
       user_email: bookeeEmail,
+      user_name: bookeeName || null,
       user_id: user.id,
       remark: bookingDraft.remark,
       checked_in: hasUnlimitedBooking,
@@ -913,6 +920,20 @@ export default function Home() {
                 className="border rounded-lg px-4 py-2 w-full disabled:bg-gray-100"
               />
             </div>
+
+            {isAdmin && (
+              <div>
+                <label className="block text-sm font-semibold mb-1">Book for name</label>
+                <input
+                  value={bookingDraft.bookeeName}
+                  onChange={(e) =>
+                    setBookingDraft({ ...bookingDraft, bookeeName: e.target.value })
+                  }
+                  className="border rounded-lg px-4 py-2 w-full"
+                  placeholder="Student or instructor name"
+                />
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-semibold mb-1">Note</label>
