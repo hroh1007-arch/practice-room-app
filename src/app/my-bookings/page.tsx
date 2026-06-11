@@ -88,8 +88,11 @@ const backupAdminEmails = [
   "ma3412@tc.columbia.edu",
 ];
 
-function today() {
-  return new Date().toISOString().split("T")[0];
+function localToday() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
 }
 
 function cleanTime(time?: string | null) {
@@ -102,7 +105,7 @@ function timeToMinutes(time: string) {
 }
 
 function bookingEnded(booking: { booking_date: string; end_time: string }) {
-  const nowDate = today();
+  const nowDate = localToday();
 
   if (booking.booking_date < nowDate) return true;
   if (booking.booking_date > nowDate) return false;
