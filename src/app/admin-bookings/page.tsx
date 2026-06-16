@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -51,6 +51,21 @@ type EquipmentCheckout = {
   returned?: boolean | null;
   notes: string | null;
 };
+
+const times = [
+  "09:00", "09:30",
+  "10:00", "10:30",
+  "11:00", "11:30",
+  "12:00", "12:30",
+  "13:00", "13:30",
+  "14:00", "14:30",
+  "15:00", "15:30",
+  "16:00", "16:30",
+  "17:00", "17:30",
+  "18:00", "18:30",
+  "19:00", "19:30",
+  "20:00", "20:30",
+];
 
 
 function displayNameFromUser(user: any) {
@@ -103,6 +118,40 @@ function bookingEnded(booking: { booking_date: string; end_time: string }) {
   return timeToMinutes(booking.end_time) <= current;
 }
 
+function minutesBetween(start: string, end: string) {
+  return timeToMinutes(end) - timeToMinutes(start);
+}
+
+function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
+  return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(aEnd) > timeToMinutes(bStart);
+}
+
+function addDays(date: string, days: number) {
+  const next = new Date(date + "T00:00:00");
+  next.setDate(next.getDate() + days);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(
+    next.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function getWeekDates(selectedDate: string) {
+  const dateObj = new Date(selectedDate + "T00:00:00");
+  const day = dateObj.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = addDays(selectedDate, diffToMonday);
+
+  return Array.from({ length: 5 }, (_, index) => addDays(monday, index));
+}
+
+function formatScheduleDate(date: string) {
+  const dateObj = new Date(date + "T00:00:00");
+  return dateObj.toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
+
 export default function AdminBookingsPage() {
   const [adminView, setAdminView] = useState<"bookings" | "roles" | "suspensions">("bookings");
   const [showSuspensionModal, setShowSuspensionModal] = useState(false);
@@ -117,8 +166,11 @@ export default function AdminBookingsPage() {
   const [classrooms, setClassrooms] = useState<Room[]>([]);
   const [practiceBookings, setPracticeBookings] = useState<PracticeBooking[]>([]);
   const [classroomBookings, setClassroomBookings] = useState<ClassroomBooking[]>([]);
+  const [scheduleClassroomBookings, setScheduleClassroomBookings] = useState<ClassroomBooking[]>([]);
   const [equipmentCheckouts, setEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
   const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
+  const [classroomScheduleDate, setClassroomScheduleDate] = useState(localToday());
+  const [classroomScheduleMode, setClassroomScheduleMode] = useState<"day" | "week">("day");
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -142,7 +194,8 @@ export default function AdminBookingsPage() {
 
     const { data: classroomData } = await supabase
       .from("classrooms")
-      .select("id, room_number");
+      .select("id, room_number")
+      .order("room_number");
 
     setClassrooms(classroomData || []);
 
@@ -162,10 +215,14 @@ export default function AdminBookingsPage() {
 
     const activePracticeBookings = (practiceData || []).filter((b) => !bookingEnded(b));
     const activeClassroomBookings = (classroomBookingData || []).filter((b) => !bookingEnded(b));
+    const scheduleBookings = (classroomBookingData || []).filter(
+      (booking) => booking.booking_date >= localToday()
+    );
 
     setPracticeBookings(activePracticeBookings);
     setClassroomBookings(activeClassroomBookings);
-    await loadAuthUserNames([...activePracticeBookings, ...activeClassroomBookings]);
+    setScheduleClassroomBookings(scheduleBookings);
+    await loadAuthUserNames([...activePracticeBookings, ...scheduleBookings]);
 
     const { data: checkoutData } = await supabase
       .from("equipment_checkouts")
@@ -212,6 +269,24 @@ export default function AdminBookingsPage() {
       booking.user_name || authUserNames[booking.user_email.toLowerCase()],
       booking.user_email
     );
+  }
+
+  function classroomBookingForCell(roomId: string, date: string, time: string) {
+    return scheduleClassroomBookings.find(
+      (booking) =>
+        booking.classroom_id === roomId &&
+        booking.booking_date === date &&
+        overlaps(booking.start_time, booking.end_time, time, cleanTimeForCellEnd(time))
+    );
+  }
+
+  function cleanTimeForCellEnd(time: string) {
+    const endMinutes = timeToMinutes(time) + 30;
+    return `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
+  }
+
+  function classroomBookingsForDate(date: string) {
+    return scheduleClassroomBookings.filter((booking) => booking.booking_date === date);
   }
 
   async function loadAuthUserNames(bookings: Array<PracticeBooking | ClassroomBooking>) {
@@ -431,6 +506,165 @@ export default function AdminBookingsPage() {
             Hello <strong>{displayNameFromUser(user)}</strong> · Logged in as <strong>{user.email}</strong>
           </span>
         </div>
+
+        <section className="bg-white rounded-2xl shadow-lg border p-6 mb-8">
+          <div className="flex items-center gap-4 flex-wrap mb-5">
+            <div>
+              <h2 className="text-3xl font-bold">Classroom Schedule</h2>
+              <p className="text-gray-600 mt-1">
+                Day and week view for classrooms 435, 519, 522, 524, and 526.
+              </p>
+            </div>
+
+            <div className="ml-auto flex gap-3 items-center flex-wrap">
+              <div className="border rounded-lg overflow-hidden flex">
+                <button
+                  onClick={() => setClassroomScheduleMode("day")}
+                  className={
+                    classroomScheduleMode === "day"
+                      ? "bg-gray-900 text-white px-4 py-2"
+                      : "bg-white px-4 py-2 hover:bg-gray-100"
+                  }
+                >
+                  Day
+                </button>
+
+                <button
+                  onClick={() => setClassroomScheduleMode("week")}
+                  className={
+                    classroomScheduleMode === "week"
+                      ? "bg-gray-900 text-white px-4 py-2"
+                      : "bg-white px-4 py-2 hover:bg-gray-100"
+                  }
+                >
+                  Week
+                </button>
+              </div>
+
+              <input
+                type="date"
+                value={classroomScheduleDate}
+                onChange={(e) => setClassroomScheduleDate(e.target.value)}
+                className="border rounded-lg px-4 py-2"
+              />
+            </div>
+          </div>
+
+          {classroomScheduleMode === "day" ? (
+            <div className="overflow-x-auto border rounded-xl">
+              <table className="w-full border-collapse text-center text-sm">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="p-3 text-left border-b min-w-28">
+                      {formatScheduleDate(classroomScheduleDate)}
+                    </th>
+
+                    {times.map((time) => (
+                      <th key={time} className="p-2 border-b font-medium min-w-20">
+                        {time}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {classrooms.map((room) => (
+                    <tr key={room.id}>
+                      <td className="p-3 border-b bg-gray-50 text-left font-semibold">
+                        {room.room_number}
+                      </td>
+
+                      {(() => {
+                        const cells: ReactNode[] = [];
+
+                        for (let index = 0; index < times.length; index++) {
+                          const time = times[index];
+                          const booking = classroomBookingForCell(
+                            room.id,
+                            classroomScheduleDate,
+                            time
+                          );
+
+                          if (booking) {
+                            if (cleanTime(booking.start_time) !== time) {
+                              continue;
+                            }
+
+                            const colSpan = Math.max(
+                              1,
+                              Math.min(
+                                Math.ceil(minutesBetween(booking.start_time, booking.end_time) / 30),
+                                times.length - index
+                              )
+                            );
+                            const label = [
+                              `${cleanTime(booking.start_time)}-${cleanTime(booking.end_time)}`,
+                              bookingPerson(booking),
+                              booking.remark,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ");
+
+                            cells.push(
+                              <td key={booking.id} colSpan={colSpan} className="border-b p-0">
+                                <div
+                                  title={label}
+                                  className="bg-gray-300 text-gray-700 border border-gray-400 text-xs min-h-12 px-2 py-1 flex items-center justify-center overflow-hidden"
+                                >
+                                  <span className="line-clamp-2">{label}</span>
+                                </div>
+                              </td>
+                            );
+
+                            continue;
+                          }
+
+                          cells.push(
+                            <td key={time} className="border-b p-0">
+                              <div className="bg-white border border-gray-200 h-12" />
+                            </td>
+                          );
+                        }
+
+                        return cells;
+                      })()}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="grid md:grid-cols-5 gap-3">
+              {getWeekDates(classroomScheduleDate).map((date) => {
+                const dayBookings = classroomBookingsForDate(date);
+
+                return (
+                  <div key={date} className="border rounded-xl p-3 min-h-40">
+                    <h3 className="font-semibold mb-3">{formatScheduleDate(date)}</h3>
+
+                    {dayBookings.length === 0 ? (
+                      <p className="text-sm text-gray-500">No classroom bookings.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {dayBookings.map((booking) => (
+                          <div key={booking.id} className="bg-gray-100 border rounded-lg p-2 text-sm">
+                            <p className="font-semibold">
+                              {classroomName(booking.classroom_id)} · {cleanTime(booking.start_time)}-{cleanTime(booking.end_time)}
+                            </p>
+                            <p className="text-gray-600">{bookingPerson(booking)}</p>
+                            {booking.remark && (
+                              <p className="text-gray-500 text-xs mt-1">{booking.remark}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         {adminView === "roles" && (
           <section className="bg-white rounded-2xl shadow-lg border p-6 mb-8">
