@@ -737,7 +737,7 @@ export default function EquipmentPage() {
               <button onClick={() => (window.location.href = "/classrooms")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Classrooms</button>
             )}
             <button onClick={() => setView("inventory")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">Inventory</button>
-            <button onClick={() => setView("active")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">{isAdmin ? "Active Renting" : "My Rentals"}</button>
+            <button onClick={() => setView("active")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">{isAdmin ? "Active Renting" : "My Renting"}</button>
             <button onClick={() => setView("returned")} className="border px-4 py-2 rounded-lg hover:bg-gray-100">{isAdmin ? "Returned" : "History"}</button>
             {isAdmin && (
               <>
