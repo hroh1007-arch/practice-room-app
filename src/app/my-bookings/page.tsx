@@ -126,6 +126,7 @@ export default function MyBookingsPage() {
   const [practiceBookings, setPracticeBookings] = useState<PracticeBooking[]>([]);
   const [classroomBookings, setClassroomBookings] = useState<ClassroomBooking[]>([]);
   const [equipmentCheckouts, setEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
+  const [returnedEquipmentCheckouts, setReturnedEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
   const [equipmentRequests, setEquipmentRequests] = useState<EquipmentRequest[]>([]);
 
   async function loadData(currentUser?: User | null) {
@@ -175,6 +176,7 @@ export default function MyBookingsPage() {
       .order("checkout_date", { ascending: false });
 
     setEquipmentCheckouts((checkoutData || []).filter((c) => !c.returned));
+    setReturnedEquipmentCheckouts((checkoutData || []).filter((c) => c.returned));
 
     const { data: requestData } = await supabase
       .from("equipment_requests")
@@ -427,10 +429,10 @@ export default function MyBookingsPage() {
           </section>
 
           <section className="bg-white rounded-2xl shadow-lg border p-6">
-            <h2 className="text-3xl font-bold mb-4">Equipment Checkouts</h2>
+            <h2 className="text-3xl font-bold mb-4">My Renting</h2>
 
             {equipmentCheckouts.length === 0 && (
-              <p className="text-gray-600">No active equipment checkouts.</p>
+              <p className="text-gray-600">No active equipment renting.</p>
             )}
 
             <div className="space-y-4">
@@ -453,7 +455,33 @@ export default function MyBookingsPage() {
             </div>
           </section>
 
-          
+          <section className="bg-white rounded-2xl shadow-lg border p-6">
+            <h2 className="text-3xl font-bold mb-4">Equipment History</h2>
+
+            {returnedEquipmentCheckouts.length === 0 && (
+              <p className="text-gray-600">No returned equipment history.</p>
+            )}
+
+            <div className="space-y-4">
+              {returnedEquipmentCheckouts.map((checkout) => (
+                <div key={checkout.id} className="border rounded-xl p-4">
+                  <p className="font-semibold text-lg">
+                    {checkout.equipment_code}
+                  </p>
+
+                  <p className="text-gray-600">
+                    Checkout: {checkout.checkout_date || "—"} · Due:{" "}
+                    {checkout.return_date || "—"} · Returned:{" "}
+                    {checkout.actual_return_date || "—"}
+                  </p>
+
+                  {checkout.notes && (
+                    <p className="text-gray-500 text-sm">Notes: {checkout.notes}</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
       </div>
     </main>
