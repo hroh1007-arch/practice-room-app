@@ -53,6 +53,8 @@ type EquipmentCheckout = {
 };
 
 const times = [
+  "07:00", "07:30",
+  "08:00", "08:30",
   "09:00", "09:30",
   "10:00", "10:30",
   "11:00", "11:30",
@@ -65,6 +67,7 @@ const times = [
   "18:00", "18:30",
   "19:00", "19:30",
   "20:00", "20:30",
+  "21:00", "21:30",
 ];
 
 
@@ -150,6 +153,18 @@ function formatScheduleDate(date: string) {
     month: "short",
     day: "numeric",
   });
+}
+
+function scheduleBlockColor(index: number) {
+  const colors = [
+    "bg-blue-600 border-blue-800",
+    "bg-red-600 border-red-800",
+    "bg-green-600 border-green-800",
+    "bg-amber-700 border-amber-900",
+    "bg-violet-600 border-violet-800",
+  ];
+
+  return colors[index % colors.length];
 }
 
 export default function AdminBookingsPage() {
@@ -634,34 +649,97 @@ export default function AdminBookingsPage() {
               </table>
             </div>
           ) : (
-            <div className="grid md:grid-cols-5 gap-3">
-              {getWeekDates(classroomScheduleDate).map((date) => {
-                const dayBookings = classroomBookingsForDate(date);
+            <div className="overflow-x-auto border rounded-xl">
+              <div
+                className="relative min-w-[980px] grid text-sm"
+                style={{
+                  gridTemplateColumns: "72px repeat(5, minmax(170px, 1fr))",
+                  gridTemplateRows: `44px repeat(${times.length}, 32px)`,
+                }}
+              >
+                <div className="sticky left-0 z-20 bg-gray-50 border-b border-r" />
 
-                return (
-                  <div key={date} className="border rounded-xl p-3 min-h-40">
-                    <h3 className="font-semibold mb-3">{formatScheduleDate(date)}</h3>
-
-                    {dayBookings.length === 0 ? (
-                      <p className="text-sm text-gray-500">No classroom bookings.</p>
-                    ) : (
-                      <div className="space-y-2">
-                        {dayBookings.map((booking) => (
-                          <div key={booking.id} className="bg-gray-100 border rounded-lg p-2 text-sm">
-                            <p className="font-semibold">
-                              {classroomName(booking.classroom_id)} · {cleanTime(booking.start_time)}-{cleanTime(booking.end_time)}
-                            </p>
-                            <p className="text-gray-600">{bookingPerson(booking)}</p>
-                            {booking.remark && (
-                              <p className="text-gray-500 text-xs mt-1">{booking.remark}</p>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                {getWeekDates(classroomScheduleDate).map((date, dayIndex) => (
+                  <div
+                    key={date}
+                    className={
+                      date === localToday()
+                        ? "bg-yellow-50 border-b border-r p-2 text-center font-semibold"
+                        : "bg-gray-50 border-b border-r p-2 text-center font-semibold"
+                    }
+                    style={{ gridColumn: dayIndex + 2, gridRow: 1 }}
+                  >
+                    {formatScheduleDate(date)}
                   </div>
-                );
-              })}
+                ))}
+
+                {times.map((time, timeIndex) => (
+                  <div
+                    key={time}
+                    className="sticky left-0 z-10 bg-gray-50 border-b border-r px-2 py-1 text-right text-xs text-gray-600"
+                    style={{ gridColumn: 1, gridRow: timeIndex + 2 }}
+                  >
+                    {time.endsWith(":00") ? time : ""}
+                  </div>
+                ))}
+
+                {getWeekDates(classroomScheduleDate).map((date, dayIndex) =>
+                  times.map((time, timeIndex) => (
+                    <div
+                      key={`${date}-${time}`}
+                      className={
+                        date === localToday()
+                          ? "bg-yellow-50/70 border-b border-r border-gray-200"
+                          : "bg-white border-b border-r border-gray-200"
+                      }
+                      style={{ gridColumn: dayIndex + 2, gridRow: timeIndex + 2 }}
+                    />
+                  ))
+                )}
+
+                {getWeekDates(classroomScheduleDate).flatMap((date, dayIndex) =>
+                  classroomBookingsForDate(date).map((booking) => {
+                    const startIndex = times.findIndex((time) => time === cleanTime(booking.start_time));
+
+                    if (startIndex < 0) return null;
+
+                    const classroomIndex = Math.max(
+                      0,
+                      classrooms.findIndex((room) => room.id === booking.classroom_id)
+                    );
+                    const rowSpan = Math.max(
+                      1,
+                      Math.ceil(minutesBetween(booking.start_time, booking.end_time) / 30)
+                    );
+                    const label = [
+                      classroomName(booking.classroom_id),
+                      `${cleanTime(booking.start_time)}-${cleanTime(booking.end_time)}`,
+                      bookingPerson(booking),
+                      booking.remark,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+
+                    return (
+                      <div
+                        key={`${date}-${booking.id}`}
+                        title={label}
+                        className={`${scheduleBlockColor(classroomIndex)} z-20 m-1 rounded px-2 py-1 text-xs text-white shadow-sm overflow-hidden`}
+                        style={{
+                          gridColumn: dayIndex + 2,
+                          gridRow: `${startIndex + 2} / span ${rowSpan}`,
+                        }}
+                      >
+                        <div className="font-semibold">
+                          {classroomName(booking.classroom_id)} · {cleanTime(booking.start_time)}-{cleanTime(booking.end_time)}
+                        </div>
+                        <div>{bookingPerson(booking)}</div>
+                        {booking.remark && <div>{booking.remark}</div>}
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           )}
         </section>
