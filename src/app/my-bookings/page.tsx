@@ -210,7 +210,7 @@ export default function MyBookingsPage() {
     (user?.email ? backupAdminEmails.includes(user.email.toLowerCase()) : false);
 
   const isInstructor = currentRole === "instructor";
-  const canSeeClassrooms = isAdmin || isInstructor;
+  const canSeeClassrooms = isAdmin;
 
   async function login() {
     await supabase.auth.signInWithOAuth({
