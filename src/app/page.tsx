@@ -59,7 +59,7 @@ export default function HomePage() {
     (user?.email ? backupAdminEmails.includes(user.email.toLowerCase()) : false);
 
   const isInstructor = currentRole === "instructor";
-  const canSeeClassrooms = isAdmin || isInstructor;
+  const canSeeClassrooms = isAdmin;
 
   function goTo(path: string) {
     if (!user) {
