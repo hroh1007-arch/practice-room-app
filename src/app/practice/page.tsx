@@ -1114,7 +1114,7 @@ export default function Home() {
                   Practice Rooms
                 </button>
 
-                {hasUnlimitedBooking && (
+                {isAdmin && (
                   <button
                     onClick={() => (window.location.href = "/classrooms")}
                     className="border px-4 py-2 rounded-lg hover:bg-gray-100"
