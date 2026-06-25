@@ -1024,23 +1024,26 @@ export default function Home() {
 
             <div>
               <label className="text-sm">Start Date</label>
-              <input
-                aria-label="Recurring practice booking start date"
-                type="date"
+              <KeyboardDatePicker
+                id="recurring-practice-start-date"
+                label="Recurring practice booking start date"
                 value={recurringStartDate}
-                onChange={(e) => setRecurringStartDate(e.target.value)}
-                className="border rounded-lg px-3 py-2 w-full"
+                min={localToday()}
+                onChange={(value) => {
+                  setRecurringStartDate(value);
+                  if (recurringEndDate < value) setRecurringEndDate(value);
+                }}
               />
             </div>
 
             <div>
               <label className="text-sm">End Date</label>
-              <input
-                aria-label="Recurring practice booking end date"
-                type="date"
+              <KeyboardDatePicker
+                id="recurring-practice-end-date"
+                label="Recurring practice booking end date"
                 value={recurringEndDate}
-                onChange={(e) => setRecurringEndDate(e.target.value)}
-                className="border rounded-lg px-3 py-2 w-full"
+                min={recurringStartDate || localToday()}
+                onChange={setRecurringEndDate}
               />
             </div>
 
