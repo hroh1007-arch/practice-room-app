@@ -427,6 +427,13 @@ export default function AdminBookingsPage() {
             </button>
 
             <button
+              onClick={() => (window.location.href = "/admin-practice-schedule")}
+              className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+            >
+              Practice Schedule
+            </button>
+
+            <button
               onClick={() => (window.location.href = "/admin-classroom-schedule")}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
             >
