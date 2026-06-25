@@ -15,6 +15,14 @@ function localDateString(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function isBlockedDate(date: string, rows: any[]) {
+  return rows.some((row) => {
+    const start = row.start_date || row.starts_at?.slice(0, 10) || date;
+    const end = row.end_date || row.ends_at?.slice(0, 10) || "9999-12-31";
+    return row.active && row.email?.startsWith("blocked-day-") && date >= start && date <= end;
+  });
+}
+
 export async function POST(req: Request) {
   const body = await req.json();
 
@@ -64,6 +72,13 @@ export async function POST(req: Request) {
   let created = 0;
   let skippedConflicts = 0;
   let skippedWeekends = 0;
+  let skippedBlockedDays = 0;
+
+  const { data: blockedDays } = await supabase
+    .from("user_suspensions")
+    .select("*")
+    .eq("active", true)
+    .like("email", "blocked-day-%");
 
   for (
     let d = new Date(start);
@@ -82,6 +97,11 @@ export async function POST(req: Request) {
     }
 
     const bookingDate = localDateString(d);
+
+    if (isBlockedDate(bookingDate, blockedDays || [])) {
+      skippedBlockedDays++;
+      continue;
+    }
 
     const { data: conflict } = await supabase
       .from("classroom_bookings")
@@ -115,6 +135,6 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({
-    message: `Created ${created} recurring classroom bookings. Skipped ${skippedConflicts} conflicts.`,
+    message: `Created ${created} recurring classroom bookings. Skipped ${skippedConflicts} conflicts and ${skippedBlockedDays} blocked days.`,
   });
 }
