@@ -1304,7 +1304,11 @@ export default function Home() {
                 </button>
 
                 <button
-                  onClick={() => setShowRecurringModal(true)}
+                  onClick={() => {
+                    setRecurringBookeeEmail(user.email || "");
+                    setRecurringBookeeName(displayNameFromUser(user));
+                    setShowRecurringModal(true);
+                  }}
                   className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                 >
                   Recurring Bookings
