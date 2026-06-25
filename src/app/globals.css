@@ -59,6 +59,17 @@ select:focus {
   outline: none;
 }
 
+input[type="date"]:focus-visible,
+input[type="time"]:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a:focus-visible,
+textarea:focus-visible,
+input:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.75);
+  outline-offset: 2px;
+}
+
 input[type="date"]::-webkit-calendar-picker-indicator,
 input[type="time"]::-webkit-calendar-picker-indicator {
   cursor: pointer;
@@ -84,4 +95,19 @@ select {
   background-size: 6px 6px, 6px 6px;
   background-repeat: no-repeat;
   padding-right: 2.5rem;
+}
+
+@media (forced-colors: active) {
+  input[type="date"],
+  input[type="time"],
+  select {
+    border: 1px solid ButtonText;
+    box-shadow: none;
+  }
+
+  select {
+    appearance: auto;
+    background-image: none;
+    padding-right: 0.75rem;
+  }
 }
