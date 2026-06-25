@@ -158,13 +158,12 @@ export default function KeyboardDatePicker({
         id={id}
         aria-label={label}
         aria-expanded={open}
-        type="date"
+        type="text"
         value={value}
-        min={min}
+        readOnly
         onClick={openCalendar}
         onFocus={() => setCursor(clampDate(value || todayString(), min))}
-        onChange={(event) => onChange(event.target.value)}
-        className="border rounded-lg px-4 py-2 w-full"
+        className="border rounded-lg px-4 py-2 w-full cursor-pointer bg-white"
       />
 
       {open && (
