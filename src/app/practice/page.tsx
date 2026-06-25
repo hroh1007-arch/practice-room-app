@@ -852,9 +852,36 @@ export default function Home() {
   }
 
   async function createRecurringBooking() {
-    if (!hasUnlimitedBooking) {
-      alert("Only instructors/admins can create recurring bookings.");
+    if (!user?.email) {
+      alert("Please log in first.");
       return;
+    }
+
+    if (isPastDate(recurringStartDate) || isPastDate(recurringEndDate)) {
+      alert("You cannot create recurring bookings in the past.");
+      return;
+    }
+
+    if (recurringEndDate < recurringStartDate) {
+      alert("End date must be after start date.");
+      return;
+    }
+
+    const duration = minutesBetween(recurringStartTime, recurringEndTime);
+
+    if (duration < 30) {
+      alert("Minimum booking time is 30 minutes.");
+      return;
+    }
+
+    if (!hasUnlimitedBooking && duration > 120) {
+      alert("Students can only book up to 2 hours at once.");
+      return;
+    }
+
+    if (!hasUnlimitedBooking) {
+      const suspended = await checkSuspension();
+      if (suspended) return;
     }
 
     const response = await fetch("/api/recurring-booking", {
@@ -872,6 +899,7 @@ export default function Home() {
         remark: recurringRemark,
         email: user?.email,
         userName: displayNameFromUser(user),
+        hasUnlimitedBooking,
       }),
     });
 
@@ -974,7 +1002,7 @@ export default function Home() {
       {showRecurringModal && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-4">
-            <h2 className="text-2xl font-bold">Recurring Bookingss</h2>
+            <h2 className="text-2xl font-bold">Recurring Bookings</h2>
 
             <input
               placeholder="Room Number"
@@ -1130,14 +1158,12 @@ export default function Home() {
                   Equipment
                 </button>
 
-                {hasUnlimitedBooking && (
-                  <button
-                    onClick={() => setShowRecurringModal(true)}
-                    className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                  >
-                    Recurring Bookings
-                  </button>
-                )}
+                <button
+                  onClick={() => setShowRecurringModal(true)}
+                  className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                >
+                  Recurring Bookings
+                </button>
 
                 <button
                   onClick={() => (window.location.href = "/my-bookings")}
