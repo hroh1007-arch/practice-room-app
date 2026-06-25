@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import KeyboardDatePicker from "@/components/KeyboardDatePicker";
 
 type Suspension = {
   email: string;
@@ -11,6 +12,8 @@ type Suspension = {
   reason: string | null;
   start_date: string | null;
   end_date: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
   active: boolean;
 };
 
@@ -20,6 +23,27 @@ const adminEmails = [
   "instruments@tc.columbia.edu",
   "ma3412@tc.columbia.edu",
 ];
+
+function today() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function addDays(date: string, days: number) {
+  const next = new Date(`${date || today()}T00:00:00`);
+  next.setDate(next.getDate() + days);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(
+    next.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function inclusiveDays(start: string, end: string) {
+  const startDate = new Date(`${start}T00:00:00`).getTime();
+  const endDate = new Date(`${end}T00:00:00`).getTime();
+  return Math.floor((endDate - startDate) / 86400000) + 1;
+}
 
 export default function AdminSuspensionsPage() {
   const [user, setUser] = useState<User | null>(null);
@@ -88,8 +112,15 @@ export default function AdminSuspensionsPage() {
       return;
     }
 
+    if (endDate < startDate) {
+      setMessage("End date must be the same as or after start date.");
+      return;
+    }
+
     const cleanUni = uni.trim().toLowerCase();
     const email = uniToEmail(cleanUni);
+    const startsAt = `${startDate}T00:00:00`;
+    const endsAt = `${endDate}T23:59:59`;
 
     await supabase
       .from("user_suspensions")
@@ -103,6 +134,8 @@ export default function AdminSuspensionsPage() {
       reason: reason.trim(),
       start_date: startDate,
       end_date: endDate,
+      starts_at: startsAt,
+      ends_at: endsAt,
       active: true,
     });
 
@@ -118,7 +151,13 @@ export default function AdminSuspensionsPage() {
     setReason("");
 
     await loadData();
-    setMessage("Suspension saved.");
+    setMessage(`Suspension saved for ${inclusiveDays(startDate, endDate)} day(s).`);
+  }
+
+  function setRange(days: number) {
+    const start = startDate || today();
+    setStartDate(start);
+    setEndDate(addDays(start, days - 1));
   }
 
   async function endSuspension(email: string) {
@@ -213,12 +252,15 @@ export default function AdminSuspensionsPage() {
               <label className="block text-sm font-semibold mb-1">
                 Start Date
               </label>
-              <input
-                aria-label="Suspension start date"
-                type="date"
+              <KeyboardDatePicker
+                id="suspension-start-date"
+                label="Suspension start date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="border rounded-lg px-4 py-2 w-full"
+                min={today()}
+                onChange={(value) => {
+                  setStartDate(value);
+                  if (endDate && endDate < value) setEndDate(value);
+                }}
               />
             </div>
 
@@ -226,14 +268,34 @@ export default function AdminSuspensionsPage() {
               <label className="block text-sm font-semibold mb-1">
                 End Date
               </label>
-              <input
-                aria-label="Suspension end date"
-                type="date"
+              <KeyboardDatePicker
+                id="suspension-end-date"
+                label="Suspension end date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="border rounded-lg px-4 py-2 w-full"
+                min={startDate || today()}
+                onChange={setEndDate}
               />
             </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => setRange(1)} className="border px-3 py-2 rounded-lg hover:bg-gray-100">
+              1 day
+            </button>
+            <button type="button" onClick={() => setRange(3)} className="border px-3 py-2 rounded-lg hover:bg-gray-100">
+              3 days
+            </button>
+            <button type="button" onClick={() => setRange(7)} className="border px-3 py-2 rounded-lg hover:bg-gray-100">
+              7 days
+            </button>
+            <button type="button" onClick={() => setRange(14)} className="border px-3 py-2 rounded-lg hover:bg-gray-100">
+              14 days
+            </button>
+            {startDate && endDate && endDate >= startDate && (
+              <span className="px-3 py-2 text-sm text-gray-600">
+                Blocking {inclusiveDays(startDate, endDate)} day(s)
+              </span>
+            )}
           </div>
 
           <textarea
