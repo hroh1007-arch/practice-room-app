@@ -107,6 +107,21 @@ function today() {
   return new Date().toISOString().split("T")[0];
 }
 
+function formatTime12(time?: string | null) {
+  if (!time) return "";
+  const [hour, minute] = time.slice(0, 5).split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+const timeOptions = Array.from({ length: 25 }, (_, index) => {
+  const totalMinutes = 9 * 60 + index * 30;
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, "0")}:${String(
+    totalMinutes % 60
+  ).padStart(2, "0")}`;
+});
+
 function uniFromEmail(email?: string | null) {
   return email ? email.split("@")[0] : "";
 }
@@ -661,9 +676,9 @@ export default function EquipmentPage() {
               <input className="border rounded-lg px-3 py-2" placeholder="UNI" value={editingCheckout.uni || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, uni: e.target.value })} />
               <input className="border rounded-lg px-3 py-2" placeholder="Email" value={editingCheckout.email || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, email: e.target.value })} />
               <input className="border rounded-lg px-3 py-2" placeholder="Instructor" value={editingCheckout.instructor || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, instructor: e.target.value })} />
-              <input className="border rounded-lg px-3 py-2" type="date" value={editingCheckout.checkout_date || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, checkout_date: e.target.value })} />
-              <input className="border rounded-lg px-3 py-2" type="date" value={editingCheckout.return_date || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, return_date: e.target.value })} />
-              <input className="border rounded-lg px-3 py-2" type="date" value={editingCheckout.actual_return_date || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, actual_return_date: e.target.value })} />
+              <input aria-label="Checkout date" className="border rounded-lg px-3 py-2" type="date" value={editingCheckout.checkout_date || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, checkout_date: e.target.value })} />
+              <input aria-label="Expected return date" className="border rounded-lg px-3 py-2" type="date" value={editingCheckout.return_date || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, return_date: e.target.value })} />
+              <input aria-label="Actual return date" className="border rounded-lg px-3 py-2" type="date" value={editingCheckout.actual_return_date || ""} onChange={(e) => setEditingCheckout({ ...editingCheckout, actual_return_date: e.target.value })} />
             </div>
 
             <label className="flex items-center gap-2">
@@ -696,10 +711,18 @@ export default function EquipmentPage() {
               <input className="border rounded-lg px-3 py-2" placeholder="Phone Number" value={requestForm.phone} onChange={(e) => setRequestForm({ ...requestForm, phone: e.target.value })} />
               <input className="border rounded-lg px-3 py-2" placeholder="Programme" value={requestForm.programme} onChange={(e) => setRequestForm({ ...requestForm, programme: e.target.value })} />
               <input className="border rounded-lg px-3 py-2" placeholder="Instructor" value={requestForm.instructor} onChange={(e) => setRequestForm({ ...requestForm, instructor: e.target.value })} />
-              <input className="border rounded-lg px-3 py-2" type="date" value={requestForm.start_date} onChange={(e) => setRequestForm({ ...requestForm, start_date: e.target.value })} />
-              <input className="border rounded-lg px-3 py-2" type="time" value={requestForm.start_time} onChange={(e) => setRequestForm({ ...requestForm, start_time: e.target.value })} />
-              <input className="border rounded-lg px-3 py-2" type="date" value={requestForm.end_date} onChange={(e) => setRequestForm({ ...requestForm, end_date: e.target.value })} />
-              <input className="border rounded-lg px-3 py-2" type="time" value={requestForm.end_time} onChange={(e) => setRequestForm({ ...requestForm, end_time: e.target.value })} />
+              <input aria-label="Equipment request start date" className="border rounded-lg px-3 py-2" type="date" value={requestForm.start_date} onChange={(e) => setRequestForm({ ...requestForm, start_date: e.target.value })} />
+              <select aria-label="Equipment request start time" className="border rounded-lg px-3 py-2" value={requestForm.start_time} onChange={(e) => setRequestForm({ ...requestForm, start_time: e.target.value })}>
+                {timeOptions.map((time) => (
+                  <option key={time} value={time}>{formatTime12(time)}</option>
+                ))}
+              </select>
+              <input aria-label="Equipment request end date" className="border rounded-lg px-3 py-2" type="date" value={requestForm.end_date} onChange={(e) => setRequestForm({ ...requestForm, end_date: e.target.value })} />
+              <select aria-label="Equipment request end time" className="border rounded-lg px-3 py-2" value={requestForm.end_time} onChange={(e) => setRequestForm({ ...requestForm, end_time: e.target.value })}>
+                {timeOptions.map((time) => (
+                  <option key={time} value={time}>{formatTime12(time)}</option>
+                ))}
+              </select>
             </div>
 
             <textarea className="border rounded-lg px-3 py-2 w-full" placeholder="Reason" value={requestForm.reason} onChange={(e) => setRequestForm({ ...requestForm, reason: e.target.value })} />
@@ -841,7 +864,7 @@ export default function EquipmentPage() {
                         {r.requester_name}<br />
                         <span className="text-gray-500">{r.requester_uni} · {r.requester_email}</span>
                       </td>
-                      <td className="p-3 border">{r.start_date} {r.start_time} → {r.end_date} {r.end_time}</td>
+                      <td className="p-3 border">{r.start_date} {formatTime12(r.start_time)} → {r.end_date} {formatTime12(r.end_time)}</td>
                       <td className="p-3 border">{r.reason}</td>
                       <td className="p-3 border">{r.status}</td>
                       <td className="p-3 border">
