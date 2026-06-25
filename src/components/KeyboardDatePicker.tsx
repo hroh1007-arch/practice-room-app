@@ -154,39 +154,40 @@ export default function KeyboardDatePicker({
         {label}
       </label>
 
-      <div className="flex gap-2">
-        <input
-          id={id}
-          aria-label={label}
-          type="date"
-          value={value}
-          min={min}
-          onChange={(event) => onChange(event.target.value)}
-          className="border rounded-lg px-4 py-2 w-full"
-        />
+      <input
+        id={id}
+        aria-label={label}
+        aria-expanded={open}
+        type="date"
+        value={value}
+        min={min}
+        onClick={openCalendar}
+        onFocus={() => setCursor(clampDate(value || todayString(), min))}
+        onChange={(event) => onChange(event.target.value)}
+        className="border rounded-lg px-4 py-2 w-full"
+      />
 
+      {open && (
         <button
           type="button"
-          aria-label={`Open ${label} calendar`}
-          aria-expanded={open}
-          onClick={openCalendar}
-          className="border rounded-lg px-3 py-2 hover:bg-gray-100"
-        >
-          Cal
-        </button>
-      </div>
+          aria-label={`Close ${label} calendar`}
+          tabIndex={-1}
+          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-40 cursor-default bg-transparent"
+        />
+      )}
 
       {open && (
         <div
           role="dialog"
           aria-label={`${label} calendar`}
-          className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border bg-white p-4 shadow-xl"
+          className="absolute left-0 top-full z-50 mt-2 w-[420px] max-w-[calc(100vw-2rem)] rounded-xl border bg-white p-5 shadow-xl"
         >
           <div className="mb-3 flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={() => moveCursor(addMonths(cursor, -1))}
-              className="border rounded-lg px-3 py-1 hover:bg-gray-100"
+              className="border rounded-lg px-4 py-2 hover:bg-gray-100"
             >
               Prev
             </button>
@@ -199,7 +200,7 @@ export default function KeyboardDatePicker({
             <button
               type="button"
               onClick={() => moveCursor(addMonths(cursor, 1))}
-              className="border rounded-lg px-3 py-1 hover:bg-gray-100"
+              className="border rounded-lg px-4 py-2 hover:bg-gray-100"
             >
               Next
             </button>
@@ -213,7 +214,7 @@ export default function KeyboardDatePicker({
             ))}
           </div>
 
-          <div role="grid" aria-label={`${label} dates`} className="grid grid-cols-7 gap-1">
+          <div role="grid" aria-label={`${label} dates`} className="grid grid-cols-7 gap-2">
             {monthDays(cursor).map((date) => {
               const dateValue = dateToString(date);
               const disabled = Boolean(min && dateValue < min);
@@ -232,7 +233,7 @@ export default function KeyboardDatePicker({
                   onMouseEnter={() => !disabled && setCursor(dateValue)}
                   onClick={() => !disabled && commit(dateValue)}
                   className={[
-                    "h-9 rounded-lg border text-sm",
+                    "h-11 rounded-lg border text-base",
                     selected ? "bg-gray-900 text-white border-gray-900" : "bg-white hover:bg-gray-100",
                     focused && !selected ? "outline outline-2 outline-blue-500 outline-offset-1" : "",
                     outsideMonth ? "text-gray-400" : "",
