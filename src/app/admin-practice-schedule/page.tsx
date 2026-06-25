@@ -75,6 +75,13 @@ function cleanTime(time?: string | null) {
   return (time || "").slice(0, 5);
 }
 
+function formatTime12(time: string) {
+  const [hour, minute] = cleanTime(time).split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
 function timeToMinutes(time: string) {
   const [h, m] = cleanTime(time).split(":").map(Number);
   return h * 60 + m;
@@ -343,6 +350,7 @@ export default function AdminPracticeSchedulePage() {
             </div>
 
             <input
+              aria-label="Practice room schedule date"
               type="date"
               value={scheduleDate}
               onChange={(e) => setScheduleDate(e.target.value)}
@@ -358,7 +366,7 @@ export default function AdminPracticeSchedulePage() {
                     <th className="p-3 text-left border-b min-w-28">{formatScheduleDate(scheduleDate)}</th>
                     {times.map((time) => (
                       <th key={time} className="p-2 border-b font-medium min-w-20">
-                        {time}
+                        {formatTime12(time)}
                       </th>
                     ))}
                   </tr>
@@ -392,7 +400,7 @@ export default function AdminPracticeSchedulePage() {
                               )
                             );
                             const label = [
-                              `${cleanTime(booking.start_time)}-${cleanTime(booking.end_time)}`,
+                              `${formatTime12(booking.start_time)}-${formatTime12(booking.end_time)}`,
                               bookingPerson(booking),
                               booking.remark,
                               booking.recurring_series_id ? "Recurring" : "",
@@ -458,7 +466,7 @@ export default function AdminPracticeSchedulePage() {
                     className="sticky left-0 z-10 bg-gray-50 border-b border-r px-2 py-1 text-right text-xs text-gray-600"
                     style={{ gridColumn: 1, gridRow: timeIndex + 2 }}
                   >
-                    {time.endsWith(":00") ? time : ""}
+                    {time.endsWith(":00") ? formatTime12(time) : ""}
                   </div>
                 ))}
 
@@ -491,7 +499,7 @@ export default function AdminPracticeSchedulePage() {
                     );
                     const label = [
                       roomName(booking.room_id),
-                      `${cleanTime(booking.start_time)}-${cleanTime(booking.end_time)}`,
+                      `${formatTime12(booking.start_time)}-${formatTime12(booking.end_time)}`,
                       bookingPerson(booking),
                       booking.remark,
                       booking.recurring_series_id ? "Recurring" : "",
@@ -510,7 +518,7 @@ export default function AdminPracticeSchedulePage() {
                         }}
                       >
                         <div className="font-semibold">
-                          {roomName(booking.room_id)} · {cleanTime(booking.start_time)}-{cleanTime(booking.end_time)}
+                          {roomName(booking.room_id)} · {formatTime12(booking.start_time)}-{formatTime12(booking.end_time)}
                         </div>
                         <div>{bookingPerson(booking)}</div>
                         {booking.remark && <div>{booking.remark}</div>}
