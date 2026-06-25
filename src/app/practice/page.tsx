@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import KeyboardDatePicker from "@/components/KeyboardDatePicker";
 
 type Room = {
   id: string;
@@ -33,6 +34,8 @@ type Suspension = {
   email: string;
   reason?: string | null;
   active: boolean;
+  start_date?: string | null;
+  end_date?: string | null;
   starts_at?: string | null;
   ends_at?: string | null;
 };
@@ -428,6 +431,12 @@ export default function Home() {
       .maybeSingle();
 
     if (data) {
+      const today = localToday();
+      const start = data.start_date || data.starts_at?.slice(0, 10) || today;
+      const end = data.end_date || data.ends_at?.slice(0, 10) || "9999-12-31";
+
+      if (today < start || today > end) return false;
+
       alert("Your booking access is suspended.");
       return true;
     }
@@ -924,11 +933,6 @@ export default function Home() {
       return;
     }
 
-    if (isWeekend(newDate)) {
-      alert("Weekend bookings are not allowed.");
-      return;
-    }
-
     setSelection(null);
     setHoverTime(null);
     setDate(newDate);
@@ -1229,13 +1233,13 @@ export default function Home() {
             )}
 
             {view === "booking" && (
-              <input
-                aria-label="Practice room booking date"
-                type="date"
+              <KeyboardDatePicker
+                id="practice-booking-date"
+                label="Practice room booking date"
                 value={date}
                 min={localToday()}
-                onChange={(e) => handleDateChange(e.target.value)}
-                className="border rounded-lg px-4 py-2 ml-auto"
+                onChange={handleDateChange}
+                className="ml-auto w-64"
               />
             )}
           </div>
