@@ -91,6 +91,13 @@ function cleanTime(time: string) {
   return time.slice(0, 5);
 }
 
+function formatTime12(time: string) {
+  const [hour, minute] = cleanTime(time).split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
 function timeToMinutes(time: string) {
   const [h, m] = cleanTime(time).split(":").map(Number);
   return h * 60 + m;
@@ -619,7 +626,7 @@ export default function ClassroomsPage() {
             <h2 className="text-2xl font-bold">Confirm Classroom Booking</h2>
 
             <p className="text-gray-600">
-              Classroom {bookingDraft.room.room_number} · {date} · {bookingDraft.start}-{bookingDraft.end}
+              Classroom {bookingDraft.room.room_number} · {date} · {formatTime12(bookingDraft.start)}-{formatTime12(bookingDraft.end)}
             </p>
 
             <div>
@@ -722,6 +729,7 @@ export default function ClassroomsPage() {
             <div>
               <label className="text-sm">Start Date</label>
               <input
+                aria-label="Recurring classroom booking start date"
                 type="date"
                 value={recurringStartDate}
                 onChange={(e) => setRecurringStartDate(e.target.value)}
@@ -732,6 +740,7 @@ export default function ClassroomsPage() {
             <div>
               <label className="text-sm">End Date</label>
               <input
+                aria-label="Recurring classroom booking end date"
                 type="date"
                 value={recurringEndDate}
                 onChange={(e) => setRecurringEndDate(e.target.value)}
@@ -742,6 +751,7 @@ export default function ClassroomsPage() {
             <div>
               <label className="text-sm">Repeat Day</label>
               <select
+                aria-label="Recurring classroom booking repeat day"
                 value={recurringWeekday}
                 onChange={(e) => setRecurringWeekday(e.target.value)}
                 className="border rounded-lg px-3 py-2 w-full"
@@ -757,22 +767,34 @@ export default function ClassroomsPage() {
             <div className="flex gap-2">
               <div className="flex-1">
                 <label className="text-sm">Start Time</label>
-                <input
-                  type="time"
+                <select
+                  aria-label="Recurring classroom booking start time"
                   value={recurringStartTime}
                   onChange={(e) => setRecurringStartTime(e.target.value)}
                   className="border rounded-lg px-3 py-2 w-full"
-                />
+                >
+                  {times.map((time) => (
+                    <option key={time} value={time}>
+                      {formatTime12(time)}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex-1">
                 <label className="text-sm">End Time</label>
-                <input
-                  type="time"
+                <select
+                  aria-label="Recurring classroom booking end time"
                   value={recurringEndTime}
                   onChange={(e) => setRecurringEndTime(e.target.value)}
                   className="border rounded-lg px-3 py-2 w-full"
-                />
+                >
+                  {times.map((time) => (
+                    <option key={time} value={time}>
+                      {formatTime12(time)}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -859,7 +881,7 @@ export default function ClassroomsPage() {
               <p className="text-sm text-gray-700 mt-3">
                 Selected start:{" "}
                 <strong>
-                  {selection.room.room_number} {selection.start}
+                  {selection.room.room_number} {formatTime12(selection.start)}
                 </strong>
                 . Move your cursor to preview, then click an end cell.
               </p>
@@ -925,6 +947,7 @@ export default function ClassroomsPage() {
             )}
 
             <input
+              aria-label="Classroom booking date"
               type="date"
               value={date}
               min={localToday()}
@@ -942,7 +965,7 @@ export default function ClassroomsPage() {
 
                     {times.map((time) => (
                       <th key={time} className="p-3 text-sm font-medium border-b">
-                        {time}
+                        {formatTime12(time)}
                       </th>
                     ))}
                   </tr>
@@ -1057,8 +1080,8 @@ export default function ClassroomsPage() {
                       </p>
 
                       <p className="text-gray-600">
-                        {booking.booking_date} · {cleanTime(booking.start_time)}–
-                        {cleanTime(booking.end_time)}
+                        {booking.booking_date} · {formatTime12(booking.start_time)}–
+                        {formatTime12(booking.end_time)}
                       </p>
 
                       {booking.remark && (
@@ -1117,8 +1140,8 @@ export default function ClassroomsPage() {
                       </p>
 
                       <p className="text-gray-600">
-                        {booking.booking_date} · {cleanTime(booking.start_time)}–
-                        {cleanTime(booking.end_time)}
+                        {booking.booking_date} · {formatTime12(booking.start_time)}–
+                        {formatTime12(booking.end_time)}
                       </p>
 
                       <p className="text-gray-500 text-sm">
