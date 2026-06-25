@@ -17,6 +17,8 @@ type Suspension = {
   active: boolean;
 };
 
+const blockedDayPrefix = "blocked-day-";
+
 const adminEmails = [
   "hh3144@tc.columbia.edu",
   "jcg21@tc.columbia.edu",
@@ -54,6 +56,9 @@ export default function AdminSuspensionsPage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+  const [blockStartDate, setBlockStartDate] = useState("");
+  const [blockEndDate, setBlockEndDate] = useState("");
+  const [blockReason, setBlockReason] = useState("");
   const [message, setMessage] = useState("");
 
   const isAdmin =
@@ -154,6 +159,47 @@ export default function AdminSuspensionsPage() {
     setMessage(`Suspension saved for ${inclusiveDays(startDate, endDate)} day(s).`);
   }
 
+  async function saveBlockedDays() {
+    setMessage("");
+
+    if (!blockStartDate || !blockEndDate || !blockReason.trim()) {
+      setMessage("Missing: start date, end date, or reason.");
+      return;
+    }
+
+    if (blockEndDate < blockStartDate) {
+      setMessage("End date must be the same as or after start date.");
+      return;
+    }
+
+    const email = `${blockedDayPrefix}${blockStartDate}-to-${blockEndDate}-${Date.now()}@system.local`;
+    const startsAt = `${blockStartDate}T00:00:00`;
+    const endsAt = `${blockEndDate}T23:59:59`;
+
+    const { error } = await supabase.from("user_suspensions").insert({
+      email,
+      name: "Blocked Days",
+      uni: "system",
+      reason: blockReason.trim(),
+      start_date: blockStartDate,
+      end_date: blockEndDate,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      active: true,
+    });
+
+    if (error) {
+      setMessage(error.message);
+      return;
+    }
+
+    setBlockStartDate("");
+    setBlockEndDate("");
+    setBlockReason("");
+    await loadData();
+    setMessage(`Blocked booking for ${inclusiveDays(blockStartDate, blockEndDate)} day(s).`);
+  }
+
   function setRange(days: number) {
     const start = startDate || today();
     setStartDate(start);
@@ -176,6 +222,9 @@ export default function AdminSuspensionsPage() {
     await loadData();
     setMessage("Suspension ended.");
   }
+
+  const blockedDays = suspensions.filter((s) => s.email.startsWith(blockedDayPrefix));
+  const userSuspensions = suspensions.filter((s) => !s.email.startsWith(blockedDayPrefix));
 
   if (!user) {
     return (
@@ -218,7 +267,7 @@ export default function AdminSuspensionsPage() {
       <div className="max-w-6xl mx-auto">
         <h1 className="text-5xl font-bold mb-2">Suspensions</h1>
         <p className="text-gray-600 mb-8">
-          Suspend users from making new bookings.
+          Suspend users or block booking days such as holidays.
         </p>
 
         <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border flex gap-4 flex-wrap">
@@ -229,6 +278,84 @@ export default function AdminSuspensionsPage() {
             Manage Roles
           </button>
         </div>
+
+        <section className="bg-white rounded-2xl shadow-lg border p-6 mb-8">
+          <h2 className="text-2xl font-bold mb-4">Block Booking Days</h2>
+
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-semibold mb-1">
+                Start Date
+              </label>
+              <KeyboardDatePicker
+                id="blocked-days-start-date"
+                label="Blocked days start date"
+                value={blockStartDate}
+                min={today()}
+                onChange={(value) => {
+                  setBlockStartDate(value);
+                  if (blockEndDate && blockEndDate < value) setBlockEndDate(value);
+                }}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold mb-1">
+                End Date
+              </label>
+              <KeyboardDatePicker
+                id="blocked-days-end-date"
+                label="Blocked days end date"
+                value={blockEndDate}
+                min={blockStartDate || today()}
+                onChange={setBlockEndDate}
+              />
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button type="button" onClick={() => {
+              const start = blockStartDate || today();
+              setBlockStartDate(start);
+              setBlockEndDate(start);
+            }} className="border px-3 py-2 rounded-lg hover:bg-gray-100">
+              1 day
+            </button>
+            <button type="button" onClick={() => {
+              const start = blockStartDate || today();
+              setBlockStartDate(start);
+              setBlockEndDate(addDays(start, 2));
+            }} className="border px-3 py-2 rounded-lg hover:bg-gray-100">
+              3 days
+            </button>
+            <button type="button" onClick={() => {
+              const start = blockStartDate || today();
+              setBlockStartDate(start);
+              setBlockEndDate(addDays(start, 6));
+            }} className="border px-3 py-2 rounded-lg hover:bg-gray-100">
+              7 days
+            </button>
+            {blockStartDate && blockEndDate && blockEndDate >= blockStartDate && (
+              <span className="px-3 py-2 text-sm text-gray-600">
+                Blocking {inclusiveDays(blockStartDate, blockEndDate)} day(s)
+              </span>
+            )}
+          </div>
+
+          <textarea
+            value={blockReason}
+            onChange={(e) => setBlockReason(e.target.value)}
+            placeholder="Holiday, building closure, maintenance..."
+            className="border rounded-lg px-4 py-2 w-full mt-4"
+          />
+
+          <button
+            onClick={saveBlockedDays}
+            className="bg-black text-white px-5 py-3 rounded-lg mt-4"
+          >
+            Block Days
+          </button>
+        </section>
 
         <section className="bg-white rounded-2xl shadow-lg border p-6 mb-8">
           <h2 className="text-2xl font-bold mb-4">Create Suspension</h2>
@@ -320,6 +447,46 @@ export default function AdminSuspensionsPage() {
         </section>
 
         <section className="bg-white rounded-2xl shadow-lg border overflow-x-auto">
+          <h2 className="text-2xl font-bold p-4">Blocked Days</h2>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="bg-gray-50">
+                <th className="p-3 border text-left">Start</th>
+                <th className="p-3 border text-left">End</th>
+                <th className="p-3 border text-left">Reason</th>
+                <th className="p-3 border text-left">Status</th>
+                <th className="p-3 border text-left">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {blockedDays.map((s) => (
+                <tr key={s.email}>
+                  <td className="p-3 border">{s.start_date}</td>
+                  <td className="p-3 border">{s.end_date}</td>
+                  <td className="p-3 border">{s.reason}</td>
+                  <td className="p-3 border">{s.active ? "Active" : "Ended"}</td>
+                  <td className="p-3 border">
+                    {s.active && (
+                      <button onClick={() => endSuspension(s.email)} className="bg-black text-white px-3 py-1 rounded">
+                        End
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {blockedDays.length === 0 && (
+                <tr>
+                  <td className="p-6 text-gray-500" colSpan={5}>
+                    No blocked days found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </section>
+
+        <section className="bg-white rounded-2xl shadow-lg border overflow-x-auto mt-8">
+          <h2 className="text-2xl font-bold p-4">User Suspensions</h2>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="bg-gray-50">
@@ -335,7 +502,7 @@ export default function AdminSuspensionsPage() {
             </thead>
 
             <tbody>
-              {suspensions.map((s) => (
+              {userSuspensions.map((s) => (
                 <tr key={s.email}>
                   <td className="p-3 border">{s.name}</td>
                   <td className="p-3 border">{s.uni}</td>
@@ -359,7 +526,7 @@ export default function AdminSuspensionsPage() {
                 </tr>
               ))}
 
-              {suspensions.length === 0 && (
+              {userSuspensions.length === 0 && (
                 <tr>
                   <td className="p-6 text-gray-500" colSpan={8}>
                     No suspensions found.
