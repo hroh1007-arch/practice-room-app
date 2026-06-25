@@ -76,6 +76,13 @@ function cleanTime(time?: string | null) {
   return (time || "").slice(0, 5);
 }
 
+function formatTime12(time: string) {
+  const [hour, minute] = cleanTime(time).split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
 function timeToMinutes(time: string) {
   const [h, m] = cleanTime(time).split(":").map(Number);
   return h * 60 + m;
@@ -337,6 +344,7 @@ export default function AdminClassroomSchedulePage() {
             </div>
 
             <input
+              aria-label="Classroom schedule date"
               type="date"
               value={scheduleDate}
               onChange={(e) => setScheduleDate(e.target.value)}
@@ -352,7 +360,7 @@ export default function AdminClassroomSchedulePage() {
                     <th className="p-3 text-left border-b min-w-28">{formatScheduleDate(scheduleDate)}</th>
                     {times.map((time) => (
                       <th key={time} className="p-2 border-b font-medium min-w-20">
-                        {time}
+                        {formatTime12(time)}
                       </th>
                     ))}
                   </tr>
@@ -381,7 +389,7 @@ export default function AdminClassroomSchedulePage() {
                               )
                             );
                             const label = [
-                              `${cleanTime(booking.start_time)}-${cleanTime(booking.end_time)}`,
+                              `${formatTime12(booking.start_time)}-${formatTime12(booking.end_time)}`,
                               bookingPerson(booking),
                               booking.remark,
                             ]
@@ -446,7 +454,7 @@ export default function AdminClassroomSchedulePage() {
                     className="sticky left-0 z-10 bg-gray-50 border-b border-r px-2 py-1 text-right text-xs text-gray-600"
                     style={{ gridColumn: 1, gridRow: timeIndex + 2 }}
                   >
-                    {time.endsWith(":00") ? time : ""}
+                    {time.endsWith(":00") ? formatTime12(time) : ""}
                   </div>
                 ))}
 
@@ -479,7 +487,7 @@ export default function AdminClassroomSchedulePage() {
                     );
                     const label = [
                       classroomName(booking.classroom_id),
-                      `${cleanTime(booking.start_time)}-${cleanTime(booking.end_time)}`,
+                      `${formatTime12(booking.start_time)}-${formatTime12(booking.end_time)}`,
                       bookingPerson(booking),
                       booking.remark,
                     ]
@@ -497,7 +505,7 @@ export default function AdminClassroomSchedulePage() {
                         }}
                       >
                         <div className="font-semibold">
-                          {classroomName(booking.classroom_id)} · {cleanTime(booking.start_time)}-{cleanTime(booking.end_time)}
+                          {classroomName(booking.classroom_id)} · {formatTime12(booking.start_time)}-{formatTime12(booking.end_time)}
                         </div>
                         <div>{bookingPerson(booking)}</div>
                         {booking.remark && <div>{booking.remark}</div>}
