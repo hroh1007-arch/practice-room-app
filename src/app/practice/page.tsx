@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import KeyboardDatePicker from "@/components/KeyboardDatePicker";
@@ -97,6 +97,8 @@ const backupAdminEmails = [
   "instruments@tc.columbia.edu",
   "ma3412@tc.columbia.edu",
 ];
+
+const blockedDayPrefix = "blocked-day-";
 
 function localToday() {
   const now = new Date();
@@ -200,6 +202,14 @@ function uniFromEmail(email?: string | null) {
 function displayUser(email?: string | null) {
   if (!email) return "Unknown";
   return `${uniFromEmail(email)} · ${email}`;
+}
+
+function suspensionStart(row: Suspension) {
+  return row.start_date || row.starts_at?.slice(0, 10) || localToday();
+}
+
+function suspensionEnd(row: Suspension) {
+  return row.end_date || row.ends_at?.slice(0, 10) || "9999-12-31";
 }
 
 export default function Home() {
@@ -420,6 +430,52 @@ export default function Home() {
     );
   }
 
+  function blockedDayForDate(targetDate: string) {
+    return suspensions.find(
+      (row) =>
+        row.active &&
+        row.email.startsWith(blockedDayPrefix) &&
+        targetDate >= suspensionStart(row) &&
+        targetDate <= suspensionEnd(row)
+    );
+  }
+
+  function focusBookingCell(roomIndex: number, timeIndex: number) {
+    const next = document.getElementById(`practice-cell-${roomIndex}-${timeIndex}`);
+    next?.focus();
+  }
+
+  function handleCellKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    room: Room,
+    time: string,
+    roomIndex: number,
+    timeIndex: number
+  ) {
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      focusBookingCell(roomIndex, Math.min(times.length - 1, timeIndex + 1));
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      focusBookingCell(roomIndex, Math.max(0, timeIndex - 1));
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusBookingCell(Math.min(rooms.length - 1, roomIndex + 1), timeIndex);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusBookingCell(Math.max(0, roomIndex - 1), timeIndex);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusBookingCell(roomIndex, 0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusBookingCell(roomIndex, times.length - 1);
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleCellClick(room, time);
+    }
+  }
+
   async function checkSuspension() {
     if (!user?.email || hasUnlimitedBooking) return false;
 
@@ -540,6 +596,12 @@ export default function Home() {
 
     if (isWeekend(date)) {
       alert("Weekend bookings are not allowed.");
+      return;
+    }
+
+    const blockedDay = blockedDayForDate(date);
+    if (blockedDay) {
+      alert(`Bookings are blocked on this date: ${blockedDay.reason || "blocked day"}`);
       return;
     }
 
@@ -686,6 +748,17 @@ export default function Home() {
   async function cancelBooking(id: string) {
     const bookingToCancel = myBookings.find((booking) => booking.id === id) || adminBookings.find((booking) => booking.id === id);
 
+    if (bookingToCancel?.recurring_series_id) {
+      const cancelAll = window.confirm(
+        "This is a recurring booking. Press OK to cancel all bookings in this series, or Cancel to cancel only this one booking."
+      );
+
+      if (cancelAll) {
+        await cancelSeries(bookingToCancel.recurring_series_id, false);
+        return;
+      }
+    }
+
     const confirmed = window.confirm("Cancel this booking?");
     if (!confirmed) return;
 
@@ -715,9 +788,11 @@ export default function Home() {
     alert("Cancelled.");
   }
 
-  async function cancelSeries(seriesId: string) {
-    const confirmed = window.confirm("Cancel all bookings in this recurring series?");
-    if (!confirmed) return;
+  async function cancelSeries(seriesId: string, ask = true) {
+    if (ask) {
+      const confirmed = window.confirm("Cancel all bookings in this recurring series?");
+      if (!confirmed) return;
+    }
 
     const { error } = await supabase
       .from("bookings")
@@ -1263,7 +1338,7 @@ export default function Home() {
                 </thead>
 
                 <tbody>
-                  {rooms.map((room) => (
+                  {rooms.map((room, roomIndex) => (
                     <tr key={room.id}>
                       <td className="p-4 border-b font-semibold bg-gray-50 text-left">
                         <div>{room.room_number}</div>
@@ -1329,7 +1404,21 @@ export default function Home() {
                           cells.push(
                             <td key={time} className="border-b p-0">
                               <button
+                                id={`practice-cell-${roomIndex}-${index}`}
+                                aria-label={`${room.room_number}, ${formatTime12(time)} on ${date}${preview ? ", selected range" : ""}`}
                                 disabled={past || isPastDate(date)}
+                                onFocus={() => {
+                                  if (selection?.room.id === room.id) {
+                                    const previewEnd = cellEnd(time);
+
+                                    if (!hasUnlimitedBooking && minutesBetween(selection.start, previewEnd) > 120) {
+                                      return;
+                                    }
+
+                                    setHoverTime(time);
+                                  }
+                                }}
+                                onKeyDown={(event) => handleCellKeyDown(event, room, time, roomIndex, index)}
                                 onMouseEnter={() => {
                                   if (selection?.room.id === room.id) {
                                     const previewEnd = cellEnd(time);
@@ -1408,7 +1497,7 @@ export default function Home() {
                         Cancel
                       </button>
 
-                      {booking.recurring_series_id && hasUnlimitedBooking && (
+                      {booking.recurring_series_id && (
                         <button
                           onClick={() => cancelSeries(booking.recurring_series_id!)}
                           className="border px-4 py-2 rounded-lg hover:bg-gray-100"
