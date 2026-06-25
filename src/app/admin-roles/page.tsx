@@ -338,6 +338,7 @@ export default function AdminRolesPage() {
             />
 
             <select
+              aria-label="Role to add or update"
               value={role}
               onChange={(e) => setRole(e.target.value as "admin" | "instructor")}
               className="border rounded-lg px-4 py-2"
@@ -428,6 +429,7 @@ export default function AdminRolesPage() {
 
                   <td className="p-3 border">
                     <select
+                      aria-label={`Change role for ${row.email}`}
                       value={row.role}
                       onChange={(e) =>
                         changeRole(row, e.target.value as "admin" | "instructor")
@@ -483,6 +485,7 @@ export default function AdminRolesPage() {
 
                   <td className="p-3 border">
                     <select
+                      aria-label={`Change role for ${row.email}`}
                       value={row.role}
                       onChange={(e) =>
                         changeRole(row, e.target.value as "admin" | "instructor")
