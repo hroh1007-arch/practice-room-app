@@ -246,6 +246,8 @@ export default function Home() {
   const [recurringStartTime, setRecurringStartTime] = useState("09:00");
   const [recurringEndTime, setRecurringEndTime] = useState("10:00");
   const [recurringRemark, setRecurringRemark] = useState("");
+  const [recurringBookeeEmail, setRecurringBookeeEmail] = useState("");
+  const [recurringBookeeName, setRecurringBookeeName] = useState("");
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -975,6 +977,19 @@ export default function Home() {
       if (suspended) return;
     }
 
+    const bookeeEmail = (isAdmin ? recurringBookeeEmail : user.email)
+      .trim()
+      .toLowerCase();
+    const bookeeName =
+      isAdmin && bookeeEmail !== user.email.toLowerCase()
+        ? recurringBookeeName.trim()
+        : displayNameFromUser(user);
+
+    if (!bookeeEmail) {
+      alert("Bookee email is required.");
+      return;
+    }
+
     const response = await fetch("/api/recurring-booking", {
       method: "POST",
       headers: {
@@ -988,8 +1003,8 @@ export default function Home() {
         startTime: recurringStartTime,
         endTime: recurringEndTime,
         remark: recurringRemark,
-        email: user?.email,
-        userName: displayNameFromUser(user),
+        email: bookeeEmail,
+        userName: bookeeName,
         hasUnlimitedBooking,
       }),
     });
@@ -999,6 +1014,8 @@ export default function Home() {
     alert(data.message);
 
     setShowRecurringModal(false);
+    setRecurringBookeeEmail("");
+    setRecurringBookeeName("");
     await loadData();
   }
 
@@ -1178,6 +1195,30 @@ export default function Home() {
               onChange={(e) => setRecurringRemark(e.target.value)}
               className="border rounded-lg px-3 py-2 w-full"
             />
+
+            {isAdmin && (
+              <>
+                <div>
+                  <label className="text-sm">Book for email</label>
+                  <input
+                    value={recurringBookeeEmail}
+                    onChange={(e) => setRecurringBookeeEmail(e.target.value)}
+                    className="border rounded-lg px-3 py-2 w-full"
+                    placeholder="student@tc.columbia.edu"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-sm">Book for name</label>
+                  <input
+                    value={recurringBookeeName}
+                    onChange={(e) => setRecurringBookeeName(e.target.value)}
+                    className="border rounded-lg px-3 py-2 w-full"
+                    placeholder="Student name"
+                  />
+                </div>
+              </>
+            )}
 
             <div className="flex gap-2 justify-end">
               <button
