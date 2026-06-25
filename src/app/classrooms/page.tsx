@@ -198,6 +198,7 @@ export default function ClassroomsPage() {
   const [recurringStartTime, setRecurringStartTime] = useState("09:00");
   const [recurringEndTime, setRecurringEndTime] = useState("10:00");
   const [recurringBookeeEmail, setRecurringBookeeEmail] = useState("");
+  const [recurringBookeeName, setRecurringBookeeName] = useState("");
   const [recurringInstructor, setRecurringInstructor] = useState("");
   const [recurringCourseName, setRecurringCourseName] = useState("");
   const [recurringCourseCode, setRecurringCourseCode] = useState("");
@@ -625,7 +626,7 @@ export default function ClassroomsPage() {
         userName:
           bookeeEmail === user?.email?.toLowerCase()
             ? displayNameFromUser(user)
-            : "",
+            : recurringBookeeName.trim(),
       }),
     });
 
@@ -634,6 +635,7 @@ export default function ClassroomsPage() {
 
     setShowRecurringModal(false);
     setRecurringBookeeEmail("");
+    setRecurringBookeeName("");
     setRecurringInstructor("");
     setRecurringCourseName("");
     setRecurringCourseCode("");
@@ -900,6 +902,18 @@ export default function ClassroomsPage() {
               />
             </div>
 
+            {isAdmin && (
+              <div>
+                <label className="text-sm">Book for name</label>
+                <input
+                  value={recurringBookeeName}
+                  onChange={(e) => setRecurringBookeeName(e.target.value)}
+                  className="border rounded-lg px-3 py-2 w-full"
+                  placeholder="Student or instructor name"
+                />
+              </div>
+            )}
+
             <div>
               <label className="text-sm">Instructor</label>
               <input
@@ -1012,6 +1026,7 @@ export default function ClassroomsPage() {
             <button
               onClick={() => {
                 setRecurringBookeeEmail(user?.email || "");
+                setRecurringBookeeName(displayNameFromUser(user));
                 setShowRecurringModal(true);
               }}
               className="border px-4 py-2 rounded-lg hover:bg-gray-100"
