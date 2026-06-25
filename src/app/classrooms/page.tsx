@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import KeyboardDatePicker from "@/components/KeyboardDatePicker";
 
 type Classroom = {
   id: string;
@@ -561,11 +562,6 @@ export default function ClassroomsPage() {
       return;
     }
 
-    if (isWeekend(newDate)) {
-      alert("Weekend bookings are not allowed.");
-      return;
-    }
-
     setSelection(null);
     setHoverTime(null);
     setDate(newDate);
@@ -946,13 +942,13 @@ export default function ClassroomsPage() {
               </button>
             )}
 
-            <input
-              aria-label="Classroom booking date"
-              type="date"
+            <KeyboardDatePicker
+              id="classroom-booking-date"
+              label="Classroom booking date"
               value={date}
               min={localToday()}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="border rounded-lg px-4 py-2 ml-auto"
+              onChange={handleDateChange}
+              className="ml-auto w-64"
             />
           </div>
 
