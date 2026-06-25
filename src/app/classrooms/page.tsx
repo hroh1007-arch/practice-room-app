@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type KeyboardEvent, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import KeyboardDatePicker from "@/components/KeyboardDatePicker";
@@ -27,6 +27,17 @@ type UserRole = {
   id?: string;
   email: string;
   role: "admin" | "instructor";
+};
+
+type Suspension = {
+  id?: string;
+  email: string;
+  reason?: string | null;
+  active: boolean;
+  start_date?: string | null;
+  end_date?: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
 };
 
 type Selection = {
@@ -83,6 +94,8 @@ const backupAdminEmails = [
   "ma3412@tc.columbia.edu",
 ];
 
+const blockedDayPrefix = "blocked-day-";
+
 function localToday() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
@@ -118,6 +131,14 @@ function minutesBetween(start: string, end: string) {
 
 function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: string) {
   return timeToMinutes(aStart) < timeToMinutes(bEnd) && timeToMinutes(aEnd) > timeToMinutes(bStart);
+}
+
+function suspensionStart(row: Suspension) {
+  return row.start_date || row.starts_at?.slice(0, 10) || localToday();
+}
+
+function suspensionEnd(row: Suspension) {
+  return row.end_date || row.ends_at?.slice(0, 10) || "9999-12-31";
 }
 
 function isWeekend(date: string) {
@@ -160,6 +181,7 @@ export default function ClassroomsPage() {
   const [bookings, setBookings] = useState<ClassroomBooking[]>([]);
   const [myBookings, setMyBookings] = useState<ClassroomBooking[]>([]);
   const [adminBookings, setAdminBookings] = useState<ClassroomBooking[]>([]);
+  const [suspensions, setSuspensions] = useState<Suspension[]>([]);
 
   const [date, setDate] = useState(localToday());
   const [view, setView] = useState<"booking" | "myBookings" | "admin">("booking");
@@ -195,6 +217,12 @@ export default function ClassroomsPage() {
   async function loadData() {
     const { data: roleData } = await supabase.from("user_roles").select("*");
     setRoles(roleData || []);
+
+    const { data: suspensionData } = await supabase
+      .from("user_suspensions")
+      .select("*")
+      .order("email", { ascending: true });
+    setSuspensions(suspensionData || []);
 
     const { data: classroomData } = await supabase
       .from("classrooms")
@@ -288,6 +316,52 @@ export default function ClassroomsPage() {
     );
   }
 
+  function blockedDayForDate(targetDate: string) {
+    return suspensions.find(
+      (row) =>
+        row.active &&
+        row.email.startsWith(blockedDayPrefix) &&
+        targetDate >= suspensionStart(row) &&
+        targetDate <= suspensionEnd(row)
+    );
+  }
+
+  function focusBookingCell(roomIndex: number, timeIndex: number) {
+    const next = document.getElementById(`classroom-cell-${roomIndex}-${timeIndex}`);
+    next?.focus();
+  }
+
+  function handleCellKeyDown(
+    event: KeyboardEvent<HTMLButtonElement>,
+    room: Classroom,
+    time: string,
+    roomIndex: number,
+    timeIndex: number
+  ) {
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      focusBookingCell(roomIndex, Math.min(times.length - 1, timeIndex + 1));
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      focusBookingCell(roomIndex, Math.max(0, timeIndex - 1));
+    } else if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusBookingCell(Math.min(classrooms.length - 1, roomIndex + 1), timeIndex);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusBookingCell(Math.max(0, roomIndex - 1), timeIndex);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusBookingCell(roomIndex, 0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusBookingCell(roomIndex, times.length - 1);
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      handleCellClick(room, time);
+    }
+  }
+
   async function handleCellClick(room: Classroom, time: string) {
     if (!user) {
       alert("Please log in first.");
@@ -306,6 +380,12 @@ export default function ClassroomsPage() {
 
     if (isWeekend(date)) {
       alert("Weekend bookings are not allowed.");
+      return;
+    }
+
+    const blockedDay = blockedDayForDate(date);
+    if (blockedDay) {
+      alert(`Bookings are blocked on this date: ${blockedDay.reason || "blocked day"}`);
       return;
     }
 
@@ -421,6 +501,17 @@ export default function ClassroomsPage() {
       return;
     }
 
+    if (bookingToCancel?.recurring_series_id) {
+      const cancelAll = window.confirm(
+        "This is a recurring classroom booking. Press OK to cancel all bookings in this series, or Cancel to cancel only this one booking."
+      );
+
+      if (cancelAll) {
+        await cancelSeries(bookingToCancel.recurring_series_id, false);
+        return;
+      }
+    }
+
     const confirmed = window.confirm("Cancel this classroom booking?");
     if (!confirmed) return;
 
@@ -450,9 +541,11 @@ export default function ClassroomsPage() {
     alert("Cancelled.");
   }
 
-  async function cancelSeries(seriesId: string) {
-    const confirmed = window.confirm("Cancel all classroom bookings in this recurring series?");
-    if (!confirmed) return;
+  async function cancelSeries(seriesId: string, ask = true) {
+    if (ask) {
+      const confirmed = window.confirm("Cancel all classroom bookings in this recurring series?");
+      if (!confirmed) return;
+    }
 
     const { error } = await supabase
       .from("classroom_bookings")
@@ -971,7 +1064,7 @@ export default function ClassroomsPage() {
                 </thead>
 
                 <tbody>
-                  {classrooms.map((room) => (
+                  {classrooms.map((room, roomIndex) => (
                     <tr key={room.id}>
                       <td className="p-4 border-b font-semibold bg-gray-50 text-left">
                         <div>{room.room_number}</div>
@@ -1031,7 +1124,15 @@ export default function ClassroomsPage() {
                           cells.push(
                             <td key={time} className="border-b p-0">
                               <button
+                                id={`classroom-cell-${roomIndex}-${index}`}
+                                aria-label={`${room.room_number}, ${formatTime12(time)} on ${date}${preview ? ", selected range" : ""}`}
                                 disabled={past || isPastDate(date)}
+                                onFocus={() => {
+                                  if (selection?.room.id === room.id) {
+                                    setHoverTime(time);
+                                  }
+                                }}
+                                onKeyDown={(event) => handleCellKeyDown(event, room, time, roomIndex, index)}
                                 onMouseEnter={() => {
                                   if (selection?.room.id === room.id) {
                                     setHoverTime(time);
