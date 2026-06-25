@@ -17,6 +17,29 @@ type Suspension = {
   active: boolean;
 };
 
+type PracticeBooking = {
+  id: string;
+  room_id: string;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  user_email: string;
+};
+
+type ClassroomBooking = {
+  id: string;
+  classroom_id: string;
+  booking_date: string;
+  start_time: string;
+  end_time: string;
+  user_email: string;
+};
+
+type Room = {
+  id: string;
+  room_number: string;
+};
+
 const blockedDayPrefix = "blocked-day-";
 
 const adminEmails = [
@@ -45,6 +68,10 @@ function inclusiveDays(start: string, end: string) {
   const startDate = new Date(`${start}T00:00:00`).getTime();
   const endDate = new Date(`${end}T00:00:00`).getTime();
   return Math.floor((endDate - startDate) / 86400000) + 1;
+}
+
+function cleanTime(time?: string | null) {
+  return (time || "").slice(0, 5);
 }
 
 export default function AdminSuspensionsPage() {
@@ -193,11 +220,106 @@ export default function AdminSuspensionsPage() {
       return;
     }
 
+    const cancelledCount = await cancelBookingsForBlockedDays(blockStartDate, blockEndDate);
+
     setBlockStartDate("");
     setBlockEndDate("");
     setBlockReason("");
     await loadData();
-    setMessage(`Blocked booking for ${inclusiveDays(blockStartDate, blockEndDate)} day(s).`);
+    setMessage(
+      `Blocked booking for ${inclusiveDays(blockStartDate, blockEndDate)} day(s). Cancelled ${cancelledCount} existing booking(s).`
+    );
+  }
+
+  async function cancelBookingsForBlockedDays(start: string, end: string) {
+    const [{ data: rooms }, { data: classrooms }, { data: practiceBookings }, { data: classroomBookings }] =
+      await Promise.all([
+        supabase.from("practice_rooms").select("id, room_number"),
+        supabase.from("classrooms").select("id, room_number"),
+        supabase
+          .from("bookings")
+          .select("id, room_id, booking_date, start_time, end_time, user_email")
+          .gte("booking_date", start)
+          .lte("booking_date", end),
+        supabase
+          .from("classroom_bookings")
+          .select("id, classroom_id, booking_date, start_time, end_time, user_email")
+          .gte("booking_date", start)
+          .lte("booking_date", end),
+      ]);
+
+    const roomName = (id: string) =>
+      ((rooms || []) as Room[]).find((room) => room.id === id)?.room_number || "Practice Room";
+    const classroomName = (id: string) =>
+      ((classrooms || []) as Room[]).find((room) => room.id === id)?.room_number || "Classroom";
+
+    const practiceRows = (practiceBookings || []) as PracticeBooking[];
+    const classroomRows = (classroomBookings || []) as ClassroomBooking[];
+
+    await Promise.all([
+      ...practiceRows.map((booking) =>
+        fetch("/api/send-booking-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "cancel",
+            email: booking.user_email,
+            room: roomName(booking.room_id),
+            date: booking.booking_date,
+            startTime: cleanTime(booking.start_time),
+            endTime: cleanTime(booking.end_time),
+          }),
+        })
+      ),
+      ...classroomRows.map((booking) =>
+        fetch("/api/send-booking-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            type: "cancel",
+            email: booking.user_email,
+            room: classroomName(booking.classroom_id),
+            date: booking.booking_date,
+            startTime: cleanTime(booking.start_time),
+            endTime: cleanTime(booking.end_time),
+          }),
+        })
+      ),
+    ]);
+
+    const deleteTasks = [];
+    if (practiceRows.length > 0) {
+      deleteTasks.push(
+        supabase
+          .from("bookings")
+          .delete()
+          .in(
+            "id",
+            practiceRows.map((booking) => booking.id)
+          )
+      );
+    }
+
+    if (classroomRows.length > 0) {
+      deleteTasks.push(
+        supabase
+          .from("classroom_bookings")
+          .delete()
+          .in(
+            "id",
+            classroomRows.map((booking) => booking.id)
+          )
+      );
+    }
+
+    const results = await Promise.all(deleteTasks);
+    const deleteError = results.find((result) => result.error)?.error;
+    if (deleteError) {
+      setMessage(deleteError.message);
+      return 0;
+    }
+
+    return practiceRows.length + classroomRows.length;
   }
 
   function setRange(days: number) {
