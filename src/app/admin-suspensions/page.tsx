@@ -214,6 +214,7 @@ export default function AdminSuspensionsPage() {
                 Start Date
               </label>
               <input
+                aria-label="Suspension start date"
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
@@ -226,6 +227,7 @@ export default function AdminSuspensionsPage() {
                 End Date
               </label>
               <input
+                aria-label="Suspension end date"
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
