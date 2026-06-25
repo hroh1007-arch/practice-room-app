@@ -85,6 +85,13 @@ function cleanTime(time?: string | null) {
   return (time || "").slice(0, 5);
 }
 
+function formatTime12(time: string) {
+  const [hour, minute] = cleanTime(time).split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
 function timeToMinutes(time: string) {
   const [h, m] = cleanTime(time).split(":").map(Number);
   return h * 60 + m;
@@ -334,6 +341,7 @@ export default function AdminBookingsPage() {
               />
 
               <input
+                aria-label="Suspension start date"
                 type="date"
                 value={suspensionStart}
                 onChange={(e) => setSuspensionStart(e.target.value)}
@@ -341,6 +349,7 @@ export default function AdminBookingsPage() {
               />
 
               <input
+                aria-label="Suspension end date"
                 type="date"
                 value={suspensionEnd}
                 onChange={(e) => setSuspensionEnd(e.target.value)}
@@ -478,7 +487,7 @@ export default function AdminBookingsPage() {
                   <div>
                     <p className="font-semibold text-lg">{roomName(booking.room_id)}</p>
                     <p className="text-gray-600">
-                      {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
+                      {booking.booking_date} · {formatTime12(booking.start_time)}–{formatTime12(booking.end_time)}
                     </p>
                     <p className="text-gray-500 text-sm">{bookingPerson(booking)}</p>
                     {booking.remark && <p className="text-gray-500 text-sm">Remark: {booking.remark}</p>}
@@ -511,7 +520,7 @@ export default function AdminBookingsPage() {
                   <div>
                     <p className="font-semibold text-lg">{classroomName(booking.classroom_id)}</p>
                     <p className="text-gray-600">
-                      {booking.booking_date} · {cleanTime(booking.start_time)}–{cleanTime(booking.end_time)}
+                      {booking.booking_date} · {formatTime12(booking.start_time)}–{formatTime12(booking.end_time)}
                     </p>
                     <p className="text-gray-500 text-sm">{bookingPerson(booking)}</p>
                     {booking.remark && <p className="text-gray-500 text-sm">Remark: {booking.remark}</p>}
