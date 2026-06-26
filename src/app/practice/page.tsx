@@ -237,6 +237,7 @@ export default function Home() {
   const [selection, setSelection] = useState<Selection>(null);
   const [hoverTime, setHoverTime] = useState<string | null>(null);
   const [bookingDraft, setBookingDraft] = useState<BookingDraft>(null);
+  const [cancelDraft, setCancelDraft] = useState<Booking | null>(null);
 
   const [showRecurringModal, setShowRecurringModal] = useState(false);
   const [recurringRoom, setRecurringRoom] = useState("");
@@ -750,52 +751,36 @@ export default function Home() {
   async function cancelBooking(id: string) {
     const bookingToCancel = myBookings.find((booking) => booking.id === id) || adminBookings.find((booking) => booking.id === id);
 
-    if (bookingToCancel?.recurring_series_id) {
-      const cancelAll = window.confirm(
-        "This is a recurring booking. Press OK to cancel all bookings in this series, or Cancel to cancel only this one booking."
-      );
+    if (!bookingToCancel) return;
+    setCancelDraft(bookingToCancel);
+  }
 
-      if (cancelAll) {
-        await cancelSeries(bookingToCancel.recurring_series_id, false);
-        return;
-      }
-    }
-
-    const confirmed = window.confirm("Cancel this booking?");
-    if (!confirmed) return;
-
-    const { error } = await supabase.from("bookings").delete().eq("id", id);
+  async function confirmCancelBooking(bookingToCancel: Booking) {
+    const { error } = await supabase.from("bookings").delete().eq("id", bookingToCancel.id);
 
     if (error) {
       alert(error.message);
       return;
     }
 
-    if (bookingToCancel) {
-      await fetch("/api/send-booking-email", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "cancel",
-          email: bookingToCancel.user_email,
-          room: roomName(bookingToCancel.room_id),
-          date: bookingToCancel.booking_date,
-          startTime: cleanTime(bookingToCancel.start_time),
-          endTime: cleanTime(bookingToCancel.end_time),
-        }),
-      });
-    }
+    await fetch("/api/send-booking-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        type: "cancel",
+        email: bookingToCancel.user_email,
+        room: roomName(bookingToCancel.room_id),
+        date: bookingToCancel.booking_date,
+        startTime: cleanTime(bookingToCancel.start_time),
+        endTime: cleanTime(bookingToCancel.end_time),
+      }),
+    });
 
+    setCancelDraft(null);
     await loadData();
-    alert("Cancelled.");
   }
 
-  async function cancelSeries(seriesId: string, ask = true) {
-    if (ask) {
-      const confirmed = window.confirm("Cancel all bookings in this recurring series?");
-      if (!confirmed) return;
-    }
-
+  async function cancelSeries(seriesId: string) {
     const { error } = await supabase
       .from("bookings")
       .delete()
@@ -806,8 +791,8 @@ export default function Home() {
       return;
     }
 
+    setCancelDraft(null);
     await loadData();
-    alert("Recurring series cancelled.");
   }
 
   async function updateRoomDescription(room: Room) {
@@ -1097,6 +1082,52 @@ export default function Home() {
               >
                 Confirm Booking
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {cancelDraft && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-5">
+            <div>
+              <h2 className="text-2xl font-bold">
+                {cancelDraft.recurring_series_id ? "Cancel Recurring Booking" : "Cancel Booking"}
+              </h2>
+              <p className="text-gray-600 mt-2">
+                {roomName(cancelDraft.room_id)} · {cancelDraft.booking_date} · {formatTime12(cancelDraft.start_time)}-
+                {formatTime12(cancelDraft.end_time)}
+              </p>
+              {cancelDraft.recurring_series_id && (
+                <p className="text-sm text-gray-500 mt-2">
+                  Choose whether to cancel only this booking or the whole recurring series.
+                </p>
+              )}
+            </div>
+
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                onClick={() => setCancelDraft(null)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Keep Booking
+              </button>
+
+              <button
+                onClick={() => confirmCancelBooking(cancelDraft)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Cancel This Booking
+              </button>
+
+              {cancelDraft.recurring_series_id && (
+                <button
+                  onClick={() => cancelSeries(cancelDraft.recurring_series_id!)}
+                  className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+                >
+                  Cancel Entire Series
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1544,7 +1575,7 @@ export default function Home() {
 
                       {booking.recurring_series_id && (
                         <button
-                          onClick={() => cancelSeries(booking.recurring_series_id!)}
+                          onClick={() => setCancelDraft(booking)}
                           className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                         >
                           Cancel Series
@@ -1608,7 +1639,7 @@ export default function Home() {
 
                       {booking.recurring_series_id && (
                         <button
-                          onClick={() => cancelSeries(booking.recurring_series_id!)}
+                          onClick={() => setCancelDraft(booking)}
                           className="border px-4 py-2 rounded-lg hover:bg-gray-100"
                         >
                           Cancel Series
