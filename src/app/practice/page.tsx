@@ -1393,7 +1393,7 @@ export default function Home() {
                 value={date}
                 min={localToday()}
                 onChange={handleDateChange}
-                className="ml-auto w-64"
+                className="ml-auto w-40"
               />
             )}
           </div>
