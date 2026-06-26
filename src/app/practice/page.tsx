@@ -1125,7 +1125,7 @@ export default function Home() {
                   onClick={() => cancelSeries(cancelDraft.recurring_series_id!)}
                   className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
                 >
-                  Cancel Entire Series
+                  Cancel All Recurring Bookings
                 </button>
               )}
             </div>
@@ -1573,14 +1573,6 @@ export default function Home() {
                         Cancel
                       </button>
 
-                      {booking.recurring_series_id && (
-                        <button
-                          onClick={() => setCancelDraft(booking)}
-                          className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                        >
-                          Cancel Series
-                        </button>
-                      )}
                     </div>
                   </div>
                 ))}
@@ -1637,14 +1629,6 @@ export default function Home() {
                         Cancel
                       </button>
 
-                      {booking.recurring_series_id && (
-                        <button
-                          onClick={() => setCancelDraft(booking)}
-                          className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                        >
-                          Cancel Series
-                        </button>
-                      )}
                     </div>
                   </div>
                 ))}
