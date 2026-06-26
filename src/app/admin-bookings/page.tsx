@@ -52,6 +52,12 @@ type EquipmentCheckout = {
   notes: string | null;
 };
 
+type SeriesCancelDraft = {
+  kind: "practice" | "classroom";
+  seriesId: string;
+  title: string;
+};
+
 function displayNameFromUser(user: any) {
   return (
     user?.user_metadata?.full_name ||
@@ -125,6 +131,7 @@ export default function AdminBookingsPage() {
   const [classroomBookings, setClassroomBookings] = useState<ClassroomBooking[]>([]);
   const [equipmentCheckouts, setEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
   const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
+  const [seriesCancelDraft, setSeriesCancelDraft] = useState<SeriesCancelDraft | null>(null);
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -281,6 +288,24 @@ export default function AdminBookingsPage() {
     await loadData();
   }
 
+  async function confirmSeriesCancel() {
+    if (!seriesCancelDraft) return;
+
+    const table = seriesCancelDraft.kind === "practice" ? "bookings" : "classroom_bookings";
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq("recurring_series_id", seriesCancelDraft.seriesId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setSeriesCancelDraft(null);
+    await loadData();
+  }
+
   async function returnEquipment(checkout: EquipmentCheckout) {
     const returnDate = prompt("Actual return date:", new Date().toISOString().split("T")[0]);
 
@@ -407,6 +432,33 @@ export default function AdminBookingsPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
+      {seriesCancelDraft && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border shadow-2xl w-full max-w-lg p-6">
+            <h2 className="text-2xl font-bold">Cancel Recurring Series</h2>
+            <p className="text-gray-600 mt-2">{seriesCancelDraft.title}</p>
+            <p className="text-sm text-gray-500 mt-2">
+              This removes every future booking in this recurring series.
+            </p>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setSeriesCancelDraft(null)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Keep Series
+              </button>
+              <button
+                onClick={confirmSeriesCancel}
+                className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+              >
+                Cancel Entire Series
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
           <h1 className="text-5xl font-bold text-gray-900">Admin Bookings</h1>
@@ -496,12 +548,28 @@ export default function AdminBookingsPage() {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => cancelPractice(booking.id)}
-                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => cancelPractice(booking.id)}
+                      className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                    {booking.recurring_series_id && (
+                      <button
+                        onClick={() =>
+                          setSeriesCancelDraft({
+                            kind: "practice",
+                            seriesId: booking.recurring_series_id!,
+                            title: `${roomName(booking.room_id)} · ${booking.booking_date} · ${bookingPerson(booking)}`,
+                          })
+                        }
+                        className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                      >
+                        Cancel Series
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -529,12 +597,28 @@ export default function AdminBookingsPage() {
                     )}
                   </div>
 
-                  <button
-                    onClick={() => cancelClassroom(booking.id)}
-                    className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
-                  >
-                    Cancel
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => cancelClassroom(booking.id)}
+                      className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                    >
+                      Cancel
+                    </button>
+                    {booking.recurring_series_id && (
+                      <button
+                        onClick={() =>
+                          setSeriesCancelDraft({
+                            kind: "classroom",
+                            seriesId: booking.recurring_series_id!,
+                            title: `${classroomName(booking.classroom_id)} · ${booking.booking_date} · ${bookingPerson(booking)}`,
+                          })
+                        }
+                        className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                      >
+                        Cancel Series
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
