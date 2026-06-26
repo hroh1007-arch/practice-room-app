@@ -159,11 +159,11 @@ export default function KeyboardDatePicker({
         aria-label={label}
         aria-expanded={open}
         type="text"
-        value={value}
+        value={value || "Select date"}
         readOnly
         onClick={openCalendar}
         onFocus={() => setCursor(clampDate(value || todayString(), min))}
-        className="border rounded-lg px-4 py-2 w-full cursor-pointer bg-white"
+        className="border rounded-lg px-3 py-2 w-full cursor-pointer bg-white"
       />
 
       {open && (
