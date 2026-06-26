@@ -29,6 +29,7 @@ type ClassroomBooking = {
 
 type BookingEditor = {
   id?: string;
+  recurringSeriesId?: string | null;
   roomId: string;
   date: string;
   start: string;
@@ -36,6 +37,9 @@ type BookingEditor = {
   email: string;
   name: string;
   remark: string;
+  mode: "single" | "recurring";
+  recurringEndDate: string;
+  recurringWeekday: string;
 };
 
 const times = [
@@ -54,6 +58,14 @@ const times = [
   "19:00", "19:30",
   "20:00", "20:30",
   "21:00", "21:30",
+];
+
+const weekdays = [
+  { value: "1", label: "Monday" },
+  { value: "2", label: "Tuesday" },
+  { value: "3", label: "Wednesday" },
+  { value: "4", label: "Thursday" },
+  { value: "5", label: "Friday" },
 ];
 
 const backupAdminEmails = [
@@ -135,6 +147,11 @@ function formatScheduleDate(date: string) {
   });
 }
 
+function weekdayFromDate(date: string) {
+  const day = new Date(date + "T00:00:00").getDay();
+  return day >= 1 && day <= 5 ? String(day) : "1";
+}
+
 function cellEnd(time: string) {
   const endMinutes = timeToMinutes(time) + 30;
   return `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
@@ -161,6 +178,7 @@ export default function AdminClassroomSchedulePage() {
   const [scheduleDate, setScheduleDate] = useState(localToday());
   const [scheduleMode, setScheduleMode] = useState<"day" | "week">("week");
   const [editor, setEditor] = useState<BookingEditor | null>(null);
+  const [deleteDraft, setDeleteDraft] = useState<BookingEditor | null>(null);
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -286,12 +304,16 @@ export default function AdminClassroomSchedulePage() {
       email: "",
       name: "",
       remark: "",
+      mode: "single",
+      recurringEndDate: date,
+      recurringWeekday: weekdayFromDate(date),
     });
   }
 
   function openEditBooking(booking: ClassroomBooking) {
     setEditor({
       id: booking.id,
+      recurringSeriesId: booking.recurring_series_id,
       roomId: booking.classroom_id,
       date: booking.booking_date,
       start: cleanTime(booking.start_time),
@@ -299,6 +321,9 @@ export default function AdminClassroomSchedulePage() {
       email: booking.user_email,
       name: booking.user_name || authUserNames[booking.user_email.toLowerCase()] || "",
       remark: booking.remark || "",
+      mode: "single",
+      recurringEndDate: booking.booking_date,
+      recurringWeekday: weekdayFromDate(booking.booking_date),
     });
   }
 
@@ -325,8 +350,43 @@ export default function AdminClassroomSchedulePage() {
       return;
     }
 
-    if (editorHasConflict(editor)) {
-      alert("This classroom already has a booking during that time.");
+    if (editor.id || editor.mode === "single") {
+      if (editorHasConflict(editor)) {
+        alert("This classroom already has a booking during that time.");
+        return;
+      }
+    } else if (editor.recurringEndDate < editor.date) {
+      alert("Recurring end date must be on or after the start date.");
+      return;
+    }
+
+    if (!editor.id && editor.mode === "recurring") {
+      const response = await fetch("/api/recurring-classroom-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room: classroomName(editor.roomId),
+          startDate: editor.date,
+          endDate: editor.recurringEndDate,
+          weekday: editor.recurringWeekday,
+          startTime: editor.start,
+          endTime: editor.end,
+          remark: editor.remark.trim(),
+          email: editor.email.trim().toLowerCase(),
+          userName: editor.name.trim() || null,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        alert(data.message || "Recurring bookings could not be created.");
+        return;
+      }
+
+      if (data.message) alert(data.message);
+      setEditor(null);
+      await loadData(user);
       return;
     }
 
@@ -356,13 +416,43 @@ export default function AdminClassroomSchedulePage() {
   async function deleteEditorBooking() {
     if (!editor?.id) return;
 
-    const { error } = await supabase.from("classroom_bookings").delete().eq("id", editor.id);
+    if (editor.recurringSeriesId) {
+      setDeleteDraft(editor);
+      return;
+    }
+
+    await confirmDeleteSingle(editor);
+  }
+
+  async function confirmDeleteSingle(draft: BookingEditor) {
+    if (!draft.id) return;
+
+    const { error } = await supabase.from("classroom_bookings").delete().eq("id", draft.id);
 
     if (error) {
       alert(error.message);
       return;
     }
 
+    setDeleteDraft(null);
+    setEditor(null);
+    await loadData(user);
+  }
+
+  async function confirmDeleteSeries(draft: BookingEditor) {
+    if (!draft.recurringSeriesId) return;
+
+    const { error } = await supabase
+      .from("classroom_bookings")
+      .delete()
+      .eq("recurring_series_id", draft.recurringSeriesId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setDeleteDraft(null);
     setEditor(null);
     await loadData(user);
   }
@@ -412,6 +502,43 @@ export default function AdminClassroomSchedulePage() {
             </div>
 
             <div className="p-6 grid md:grid-cols-2 gap-4">
+              {!editor.id && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-semibold mb-2">Booking Type</label>
+                  <div className="grid grid-cols-2 gap-2 rounded-xl border bg-gray-50 p-1">
+                    <button
+                      type="button"
+                      onClick={() => setEditor({ ...editor, mode: "single" })}
+                      className={
+                        editor.mode === "single"
+                          ? "rounded-lg bg-gray-900 px-4 py-2 font-semibold text-white"
+                          : "rounded-lg px-4 py-2 font-semibold text-gray-700 hover:bg-white"
+                      }
+                    >
+                      One-time
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setEditor({
+                          ...editor,
+                          mode: "recurring",
+                          recurringEndDate: editor.recurringEndDate || editor.date,
+                          recurringWeekday: editor.recurringWeekday || weekdayFromDate(editor.date),
+                        })
+                      }
+                      className={
+                        editor.mode === "recurring"
+                          ? "rounded-lg bg-gray-900 px-4 py-2 font-semibold text-white"
+                          : "rounded-lg px-4 py-2 font-semibold text-gray-700 hover:bg-white"
+                      }
+                    >
+                      Recurring
+                    </button>
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-sm font-semibold mb-1">Classroom</label>
                 <select
@@ -426,15 +553,52 @@ export default function AdminClassroomSchedulePage() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold mb-1">Date</label>
+                <label className="block text-sm font-semibold mb-1">
+                  {!editor.id && editor.mode === "recurring" ? "Start Date" : "Date"}
+                </label>
                 <KeyboardDatePicker
                   id="classroom-editor-date"
                   label="Classroom booking date"
                   value={editor.date}
                   min={localToday()}
-                  onChange={(value) => setEditor({ ...editor, date: value })}
+                  onChange={(value) =>
+                    setEditor({
+                      ...editor,
+                      date: value,
+                      recurringEndDate: editor.recurringEndDate < value ? value : editor.recurringEndDate,
+                      recurringWeekday: weekdayFromDate(value),
+                    })
+                  }
                 />
               </div>
+
+              {!editor.id && editor.mode === "recurring" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">End Date</label>
+                    <KeyboardDatePicker
+                      id="classroom-editor-recurring-end-date"
+                      label="Classroom recurring end date"
+                      value={editor.recurringEndDate}
+                      min={editor.date || localToday()}
+                      onChange={(value) => setEditor({ ...editor, recurringEndDate: value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Repeat On</label>
+                    <select
+                      value={editor.recurringWeekday}
+                      onChange={(e) => setEditor({ ...editor, recurringWeekday: e.target.value })}
+                      className="border rounded-lg px-3 py-2 w-full"
+                    >
+                      {weekdays.map((day) => (
+                        <option key={day.value} value={day.value}>{day.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </>
+              )}
 
               <div>
                 <label className="block text-sm font-semibold mb-1">Start</label>
@@ -506,9 +670,45 @@ export default function AdminClassroomSchedulePage() {
                   Cancel
                 </button>
                 <button onClick={saveEditor} className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800">
-                  Save Booking
+                  {!editor.id && editor.mode === "recurring" ? "Create Recurring Bookings" : "Save Booking"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteDraft && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60] p-4">
+          <div className="bg-white rounded-2xl border shadow-2xl w-full max-w-lg p-6">
+            <h2 className="text-2xl font-bold">Cancel Recurring Booking</h2>
+            <p className="text-gray-600 mt-2">
+              {classroomName(deleteDraft.roomId)} · {deleteDraft.date} · {formatTime12(deleteDraft.start)}-
+              {formatTime12(deleteDraft.end)}
+            </p>
+            <p className="text-sm text-gray-500 mt-2">
+              Choose whether to cancel only this booking or all bookings in the recurring series.
+            </p>
+
+            <div className="flex flex-wrap justify-end gap-3 mt-6">
+              <button
+                onClick={() => setDeleteDraft(null)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Keep Booking
+              </button>
+              <button
+                onClick={() => confirmDeleteSingle(deleteDraft)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Cancel This Booking
+              </button>
+              <button
+                onClick={() => confirmDeleteSeries(deleteDraft)}
+                className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+              >
+                Cancel All Recurring Bookings
+              </button>
             </div>
           </div>
         </div>
@@ -566,9 +766,6 @@ export default function AdminClassroomSchedulePage() {
               onChange={setScheduleDate}
               className="w-40"
             />
-            <button onClick={() => openNewBooking()} className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800">
-              Add Booking
-            </button>
           </div>
 
           {scheduleMode === "day" ? (
@@ -684,12 +881,15 @@ export default function AdminClassroomSchedulePage() {
 
                 {getWeekDates(scheduleDate).map((date, dayIndex) =>
                   times.map((time, timeIndex) => (
-                    <div
+                    <button
+                      type="button"
                       key={`${date}-${time}`}
+                      onClick={() => openNewBooking(date, classrooms[0]?.id || "", time)}
+                      aria-label={`Add classroom booking ${formatScheduleDate(date)} ${formatTime12(time)}`}
                       className={
                         date === localToday()
-                          ? "bg-yellow-50/70 border-b border-r border-gray-200"
-                          : "bg-white border-b border-r border-gray-200"
+                          ? "bg-yellow-50/70 border-b border-r border-gray-200 hover:bg-yellow-100 focus:bg-yellow-100"
+                          : "bg-white border-b border-r border-gray-200 hover:bg-gray-50 focus:bg-gray-100"
                       }
                       style={{ gridColumn: dayIndex + 2, gridRow: timeIndex + 2 }}
                     />
