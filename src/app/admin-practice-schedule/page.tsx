@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import KeyboardDatePicker from "@/components/KeyboardDatePicker";
 
 type Role = {
   email: string;
@@ -25,6 +26,17 @@ type PracticeBooking = {
   user_name?: string | null;
   remark?: string | null;
   recurring_series_id?: string | null;
+};
+
+type BookingEditor = {
+  id?: string;
+  roomId: string;
+  date: string;
+  start: string;
+  end: string;
+  email: string;
+  name: string;
+  remark: string;
 };
 
 const times = [
@@ -148,6 +160,7 @@ export default function AdminPracticeSchedulePage() {
   const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
   const [scheduleDate, setScheduleDate] = useState(localToday());
   const [scheduleMode, setScheduleMode] = useState<"day" | "week">("week");
+  const [editor, setEditor] = useState<BookingEditor | null>(null);
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -269,6 +282,98 @@ export default function AdminPracticeSchedulePage() {
     return bookings.filter((booking) => booking.booking_date === date);
   }
 
+  function openNewBooking(date = scheduleDate, roomId = rooms[0]?.id || "", start = "09:00") {
+    setEditor({
+      roomId,
+      date,
+      start,
+      end: cellEnd(start),
+      email: "",
+      name: "",
+      remark: "",
+    });
+  }
+
+  function openEditBooking(booking: PracticeBooking) {
+    setEditor({
+      id: booking.id,
+      roomId: booking.room_id,
+      date: booking.booking_date,
+      start: cleanTime(booking.start_time),
+      end: cleanTime(booking.end_time),
+      email: booking.user_email,
+      name: booking.user_name || authUserNames[booking.user_email.toLowerCase()] || "",
+      remark: booking.remark || "",
+    });
+  }
+
+  function editorHasConflict(draft: BookingEditor) {
+    return bookings.some(
+      (booking) =>
+        booking.id !== draft.id &&
+        booking.room_id === draft.roomId &&
+        booking.booking_date === draft.date &&
+        overlaps(booking.start_time, booking.end_time, draft.start, draft.end)
+    );
+  }
+
+  async function saveEditor() {
+    if (!editor) return;
+
+    if (!editor.roomId || !editor.date || !editor.start || !editor.end || !editor.email.trim()) {
+      alert("Room, date, time, and email are required.");
+      return;
+    }
+
+    if (timeToMinutes(editor.end) <= timeToMinutes(editor.start)) {
+      alert("End time must be after start time.");
+      return;
+    }
+
+    if (editorHasConflict(editor)) {
+      alert("This room already has a booking during that time.");
+      return;
+    }
+
+    const payload = {
+      room_id: editor.roomId,
+      booking_date: editor.date,
+      start_time: editor.start,
+      end_time: editor.end,
+      user_email: editor.email.trim().toLowerCase(),
+      user_name: editor.name.trim() || null,
+      remark: editor.remark.trim(),
+      checked_in: true,
+      checked_in_at: new Date().toISOString(),
+    };
+
+    const { error } = editor.id
+      ? await supabase.from("bookings").update(payload).eq("id", editor.id)
+      : await supabase.from("bookings").insert(payload);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEditor(null);
+    await loadData(user);
+  }
+
+  async function deleteEditorBooking() {
+    if (!editor?.id) return;
+
+    const { error } = await supabase.from("bookings").delete().eq("id", editor.id);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setEditor(null);
+    await loadData(user);
+  }
+
   if (!user) {
     return (
       <main className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
@@ -305,6 +410,117 @@ export default function AdminPracticeSchedulePage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
+      {editor && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border w-full max-w-2xl overflow-hidden">
+            <div className="bg-gray-900 text-white px-6 py-5">
+              <h2 className="text-2xl font-bold">{editor.id ? "Edit Practice Booking" : "Add Practice Booking"}</h2>
+              <p className="text-sm text-gray-300 mt-1">Admin schedule editor</p>
+            </div>
+
+            <div className="p-6 grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold mb-1">Room</label>
+                <select
+                  value={editor.roomId}
+                  onChange={(e) => setEditor({ ...editor, roomId: e.target.value })}
+                  className="border rounded-lg px-3 py-2 w-full"
+                >
+                  {rooms.map((room) => (
+                    <option key={room.id} value={room.id}>{room.room_number}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Date</label>
+                <KeyboardDatePicker
+                  id="practice-editor-date"
+                  label="Practice booking date"
+                  value={editor.date}
+                  min={localToday()}
+                  onChange={(value) => setEditor({ ...editor, date: value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Start</label>
+                <select
+                  value={editor.start}
+                  onChange={(e) => setEditor({ ...editor, start: e.target.value })}
+                  className="border rounded-lg px-3 py-2 w-full"
+                >
+                  {times.map((time) => (
+                    <option key={time} value={time}>{formatTime12(time)}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">End</label>
+                <select
+                  value={editor.end}
+                  onChange={(e) => setEditor({ ...editor, end: e.target.value })}
+                  className="border rounded-lg px-3 py-2 w-full"
+                >
+                  {times.concat("21:00").map((time) => (
+                    <option key={time} value={time}>{formatTime12(time)}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Book for email</label>
+                <input
+                  value={editor.email}
+                  onChange={(e) => setEditor({ ...editor, email: e.target.value })}
+                  className="border rounded-lg px-3 py-2 w-full"
+                  placeholder="student@tc.columbia.edu"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">Book for name</label>
+                <input
+                  value={editor.name}
+                  onChange={(e) => setEditor({ ...editor, name: e.target.value })}
+                  className="border rounded-lg px-3 py-2 w-full"
+                  placeholder="Student name"
+                />
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-semibold mb-1">Note</label>
+                <textarea
+                  value={editor.remark}
+                  onChange={(e) => setEditor({ ...editor, remark: e.target.value })}
+                  className="border rounded-lg px-3 py-2 w-full"
+                  placeholder="Optional note"
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 border-t bg-gray-50 flex flex-wrap justify-between gap-3">
+              <div>
+                {editor.id && (
+                  <button onClick={deleteEditorBooking} className="border border-red-300 text-red-700 px-4 py-2 rounded-lg hover:bg-red-50">
+                    Delete Booking
+                  </button>
+                )}
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setEditor(null)} className="border px-4 py-2 rounded-lg hover:bg-gray-100">
+                  Cancel
+                </button>
+                <button onClick={saveEditor} className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800">
+                  Save Booking
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto">
         <div className="mb-8">
           <h1 className="text-5xl font-bold text-gray-900">Practice Room Schedule</h1>
@@ -349,13 +565,17 @@ export default function AdminPracticeSchedulePage() {
               </button>
             </div>
 
-            <input
-              aria-label="Practice room schedule date"
-              type="date"
+            <KeyboardDatePicker
+              id="practice-schedule-date"
+              label="Practice room schedule date"
               value={scheduleDate}
-              onChange={(e) => setScheduleDate(e.target.value)}
-              className="border rounded-lg px-4 py-2"
+              min={localToday()}
+              onChange={setScheduleDate}
+              className="w-40"
             />
+            <button onClick={() => openNewBooking()} className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800">
+              Add Booking
+            </button>
           </div>
 
           {scheduleMode === "day" ? (
@@ -410,12 +630,13 @@ export default function AdminPracticeSchedulePage() {
 
                             cells.push(
                               <td key={booking.id} colSpan={colSpan} className="border-b p-0">
-                                <div
+                                <button
+                                  onClick={() => openEditBooking(booking)}
                                   title={label}
-                                  className="bg-gray-300 text-gray-700 border border-gray-400 text-xs min-h-12 px-2 py-1 flex items-center justify-center overflow-hidden"
+                                  className="bg-gray-300 text-gray-700 border border-gray-400 text-xs min-h-12 px-2 py-1 flex items-center justify-center overflow-hidden w-full hover:bg-gray-400/60"
                                 >
                                   <span className="line-clamp-2">{label}</span>
-                                </div>
+                                </button>
                               </td>
                             );
                             continue;
@@ -423,7 +644,11 @@ export default function AdminPracticeSchedulePage() {
 
                           cells.push(
                             <td key={time} className="border-b p-0">
-                              <div className="bg-white border border-gray-200 h-12" />
+                              <button
+                                onClick={() => openNewBooking(scheduleDate, room.id, time)}
+                                aria-label={`Add booking ${room.room_number} ${formatTime12(time)}`}
+                                className="bg-white border border-gray-200 h-12 w-full hover:bg-gray-50 focus:bg-gray-100"
+                              />
                             </td>
                           );
                         }
@@ -508,10 +733,11 @@ export default function AdminPracticeSchedulePage() {
                       .join(" · ");
 
                     return (
-                      <div
+                      <button
                         key={`${date}-${booking.id}`}
+                        onClick={() => openEditBooking(booking)}
                         title={label}
-                        className={`${scheduleBlockColor(roomIndex)} z-20 m-1 rounded px-2 py-1 text-xs text-white shadow-sm overflow-hidden`}
+                        className={`${scheduleBlockColor(roomIndex)} z-20 m-1 rounded px-2 py-1 text-xs text-white shadow-sm overflow-hidden text-left hover:brightness-110`}
                         style={{
                           gridColumn: dayIndex + 2,
                           gridRow: `${startIndex + 2} / span ${rowSpan}`,
@@ -523,7 +749,7 @@ export default function AdminPracticeSchedulePage() {
                         <div>{bookingPerson(booking)}</div>
                         {booking.remark && <div>{booking.remark}</div>}
                         {booking.recurring_series_id && <div>Recurring</div>}
-                      </div>
+                      </button>
                     );
                   })
                 )}
