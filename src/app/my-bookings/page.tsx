@@ -65,6 +65,10 @@ type Role = {
   role: "admin" | "instructor";
 };
 
+type CancelDraft =
+  | { kind: "practice"; booking: PracticeBooking }
+  | { kind: "classroom"; booking: ClassroomBooking };
+
 
 function displayNameFromUser(user: any) {
   return (
@@ -99,6 +103,13 @@ function cleanTime(time?: string | null) {
   return (time || "").slice(0, 5);
 }
 
+function formatTime12(time: string) {
+  const [hour, minute] = cleanTime(time).split(":").map(Number);
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
 function timeToMinutes(time: string) {
   const [h, m] = cleanTime(time).split(":").map(Number);
   return h * 60 + m;
@@ -128,6 +139,7 @@ export default function MyBookingsPage() {
   const [equipmentCheckouts, setEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
   const [returnedEquipmentCheckouts, setReturnedEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
   const [equipmentRequests, setEquipmentRequests] = useState<EquipmentRequest[]>([]);
+  const [cancelDraft, setCancelDraft] = useState<CancelDraft | null>(null);
 
   async function loadData(currentUser?: User | null) {
     const activeUser = currentUser || user;
@@ -221,29 +233,46 @@ export default function MyBookingsPage() {
     });
   }
 
-  async function cancelPracticeBooking(id: string) {
-    if (!confirm("Cancel this practice room booking?")) return;
+  function cancelPracticeBooking(id: string) {
+    const booking = practiceBookings.find((row) => row.id === id);
+    if (booking) setCancelDraft({ kind: "practice", booking });
+  }
 
-    const { error } = await supabase.from("bookings").delete().eq("id", id);
+  function cancelClassroomBooking(id: string) {
+    const booking = classroomBookings.find((row) => row.id === id);
+    if (booking) setCancelDraft({ kind: "classroom", booking });
+  }
+
+  async function confirmSingleCancel() {
+    if (!cancelDraft) return;
+
+    const table = cancelDraft.kind === "practice" ? "bookings" : "classroom_bookings";
+    const { error } = await supabase.from(table).delete().eq("id", cancelDraft.booking.id);
 
     if (error) {
       alert(error.message);
       return;
     }
 
+    setCancelDraft(null);
     await loadData();
   }
 
-  async function cancelClassroomBooking(id: string) {
-    if (!confirm("Cancel this classroom booking?")) return;
+  async function confirmSeriesCancel() {
+    if (!cancelDraft?.booking.recurring_series_id) return;
 
-    const { error } = await supabase.from("classroom_bookings").delete().eq("id", id);
+    const table = cancelDraft.kind === "practice" ? "bookings" : "classroom_bookings";
+    const { error } = await supabase
+      .from(table)
+      .delete()
+      .eq("recurring_series_id", cancelDraft.booking.recurring_series_id);
 
     if (error) {
       alert(error.message);
       return;
     }
 
+    setCancelDraft(null);
     await loadData();
   }
 
@@ -253,6 +282,12 @@ export default function MyBookingsPage() {
 
   function classroomName(id: string) {
     return classrooms.find((r) => r.id === id)?.room_number || id;
+  }
+
+  function cancelDraftLocation(draft: CancelDraft) {
+    return draft.kind === "practice"
+      ? roomName(draft.booking.room_id)
+      : classroomName(draft.booking.classroom_id);
   }
 
   if (!user) {
@@ -284,6 +319,48 @@ export default function MyBookingsPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
+      {cancelDraft && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl border shadow-2xl w-full max-w-lg p-6">
+            <h2 className="text-2xl font-bold">
+              {cancelDraft.booking.recurring_series_id ? "Cancel Recurring Booking" : "Cancel Booking"}
+            </h2>
+            <p className="text-gray-600 mt-2">
+              {cancelDraftLocation(cancelDraft)} · {cancelDraft.booking.booking_date} ·{" "}
+              {formatTime12(cancelDraft.booking.start_time)}-{formatTime12(cancelDraft.booking.end_time)}
+            </p>
+            {cancelDraft.booking.recurring_series_id && (
+              <p className="text-sm text-gray-500 mt-2">
+                Choose whether to cancel only this booking or all bookings in the recurring series.
+              </p>
+            )}
+
+            <div className="flex flex-wrap justify-end gap-3 mt-6">
+              <button
+                onClick={() => setCancelDraft(null)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Keep Booking
+              </button>
+              <button
+                onClick={confirmSingleCancel}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Cancel This Booking
+              </button>
+              {cancelDraft.booking.recurring_series_id && (
+                <button
+                  onClick={confirmSeriesCancel}
+                  className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+                >
+                  Cancel All Recurring Bookings
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {isAdmin && (
         <button
           onClick={() => (window.location.href = "/admin-bookings")}
@@ -357,8 +434,8 @@ export default function MyBookingsPage() {
                     </p>
 
                     <p className="text-gray-600">
-                      {booking.booking_date} · {cleanTime(booking.start_time)}–
-                      {cleanTime(booking.end_time)}
+                      {booking.booking_date} · {formatTime12(booking.start_time)}–
+                      {formatTime12(booking.end_time)}
                     </p>
 
                     {booking.remark && (
@@ -402,8 +479,8 @@ export default function MyBookingsPage() {
                     </p>
 
                     <p className="text-gray-600">
-                      {booking.booking_date} · {cleanTime(booking.start_time)}–
-                      {cleanTime(booking.end_time)}
+                      {booking.booking_date} · {formatTime12(booking.start_time)}–
+                      {formatTime12(booking.end_time)}
                     </p>
 
                     {booking.remark && (
