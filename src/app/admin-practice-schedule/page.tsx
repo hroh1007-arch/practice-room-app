@@ -30,6 +30,7 @@ type PracticeBooking = {
 
 type BookingEditor = {
   id?: string;
+  recurringSeriesId?: string | null;
   roomId: string;
   date: string;
   start: string;
@@ -37,6 +38,9 @@ type BookingEditor = {
   email: string;
   name: string;
   remark: string;
+  mode: "single" | "recurring";
+  recurringEndDate: string;
+  recurringWeekday: string;
 };
 
 const times = [
@@ -52,6 +56,14 @@ const times = [
   "18:00", "18:30",
   "19:00", "19:30",
   "20:00", "20:30",
+];
+
+const weekdays = [
+  { value: "1", label: "Monday" },
+  { value: "2", label: "Tuesday" },
+  { value: "3", label: "Wednesday" },
+  { value: "4", label: "Thursday" },
+  { value: "5", label: "Friday" },
 ];
 
 const backupAdminEmails = [
@@ -133,6 +145,11 @@ function formatScheduleDate(date: string) {
   });
 }
 
+function weekdayFromDate(date: string) {
+  const day = new Date(date + "T00:00:00").getDay();
+  return day >= 1 && day <= 5 ? String(day) : "1";
+}
+
 function cellEnd(time: string) {
   const endMinutes = timeToMinutes(time) + 30;
   return `${String(Math.floor(endMinutes / 60)).padStart(2, "0")}:${String(endMinutes % 60).padStart(2, "0")}`;
@@ -161,6 +178,7 @@ export default function AdminPracticeSchedulePage() {
   const [scheduleDate, setScheduleDate] = useState(localToday());
   const [scheduleMode, setScheduleMode] = useState<"day" | "week">("week");
   const [editor, setEditor] = useState<BookingEditor | null>(null);
+  const [deleteDraft, setDeleteDraft] = useState<BookingEditor | null>(null);
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -291,12 +309,16 @@ export default function AdminPracticeSchedulePage() {
       email: "",
       name: "",
       remark: "",
+      mode: "single",
+      recurringEndDate: date,
+      recurringWeekday: weekdayFromDate(date),
     });
   }
 
   function openEditBooking(booking: PracticeBooking) {
     setEditor({
       id: booking.id,
+      recurringSeriesId: booking.recurring_series_id,
       roomId: booking.room_id,
       date: booking.booking_date,
       start: cleanTime(booking.start_time),
@@ -304,6 +326,9 @@ export default function AdminPracticeSchedulePage() {
       email: booking.user_email,
       name: booking.user_name || authUserNames[booking.user_email.toLowerCase()] || "",
       remark: booking.remark || "",
+      mode: "single",
+      recurringEndDate: booking.booking_date,
+      recurringWeekday: weekdayFromDate(booking.booking_date),
     });
   }
 
@@ -327,6 +352,47 @@ export default function AdminPracticeSchedulePage() {
 
     if (timeToMinutes(editor.end) <= timeToMinutes(editor.start)) {
       alert("End time must be after start time.");
+      return;
+    }
+
+    if (editor.id || editor.mode === "single") {
+      if (editorHasConflict(editor)) {
+        alert("This room already has a booking during that time.");
+        return;
+      }
+    } else if (editor.recurringEndDate < editor.date) {
+      alert("Recurring end date must be on or after the start date.");
+      return;
+    }
+
+    if (!editor.id && editor.mode === "recurring") {
+      const response = await fetch("/api/recurring-booking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          room: roomName(editor.roomId),
+          startDate: editor.date,
+          endDate: editor.recurringEndDate,
+          weekday: editor.recurringWeekday,
+          startTime: editor.start,
+          endTime: editor.end,
+          remark: editor.remark.trim(),
+          email: editor.email.trim().toLowerCase(),
+          userName: editor.name.trim() || null,
+          hasUnlimitedBooking: true,
+        }),
+      });
+
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        alert(data.message || "Recurring bookings could not be created.");
+        return;
+      }
+
+      if (data.message) alert(data.message);
+      setEditor(null);
+      await loadData(user);
       return;
     }
 
@@ -363,13 +429,43 @@ export default function AdminPracticeSchedulePage() {
   async function deleteEditorBooking() {
     if (!editor?.id) return;
 
-    const { error } = await supabase.from("bookings").delete().eq("id", editor.id);
+    if (editor.recurringSeriesId) {
+      setDeleteDraft(editor);
+      return;
+    }
+
+    await confirmDeleteSingle(editor);
+  }
+
+  async function confirmDeleteSingle(draft: BookingEditor) {
+    if (!draft.id) return;
+
+    const { error } = await supabase.from("bookings").delete().eq("id", draft.id);
 
     if (error) {
       alert(error.message);
       return;
     }
 
+    setDeleteDraft(null);
+    setEditor(null);
+    await loadData(user);
+  }
+
+  async function confirmDeleteSeries(draft: BookingEditor) {
+    if (!draft.recurringSeriesId) return;
+
+    const { error } = await supabase
+      .from("bookings")
+      .delete()
+      .eq("recurring_series_id", draft.recurringSeriesId);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setDeleteDraft(null);
     setEditor(null);
     await loadData(user);
   }
