@@ -52,11 +52,9 @@ type EquipmentCheckout = {
   notes: string | null;
 };
 
-type SeriesCancelDraft = {
-  kind: "practice" | "classroom";
-  seriesId: string;
-  title: string;
-};
+type AdminCancelDraft =
+  | { kind: "practice"; booking: PracticeBooking }
+  | { kind: "classroom"; booking: ClassroomBooking };
 
 function displayNameFromUser(user: any) {
   return (
@@ -131,7 +129,7 @@ export default function AdminBookingsPage() {
   const [classroomBookings, setClassroomBookings] = useState<ClassroomBooking[]>([]);
   const [equipmentCheckouts, setEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
   const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
-  const [seriesCancelDraft, setSeriesCancelDraft] = useState<SeriesCancelDraft | null>(null);
+  const [cancelDraft, setCancelDraft] = useState<AdminCancelDraft | null>(null);
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -228,6 +226,12 @@ export default function AdminBookingsPage() {
     );
   }
 
+  function cancelDraftLocation(draft: AdminCancelDraft) {
+    return draft.kind === "practice"
+      ? roomName(draft.booking.room_id)
+      : classroomName(draft.booking.classroom_id);
+  }
+
   async function loadAuthUserNames(bookings: Array<PracticeBooking | ClassroomBooking>) {
     const emails = Array.from(
       new Set(
@@ -262,47 +266,46 @@ export default function AdminBookingsPage() {
     setAuthUserNames(data.names || {});
   }
 
-  async function cancelPractice(id: string) {
-    if (!confirm("Cancel this practice room booking?")) return;
-
-    const { error } = await supabase.from("bookings").delete().eq("id", id);
-
-    if (error) {
-      alert(error.message);
-      return;
-    }
-
-    await loadData();
+  function cancelPractice(id: string) {
+    const booking = practiceBookings.find((row) => row.id === id);
+    if (booking) setCancelDraft({ kind: "practice", booking });
   }
 
-  async function cancelClassroom(id: string) {
-    if (!confirm("Cancel this classroom booking?")) return;
+  function cancelClassroom(id: string) {
+    const booking = classroomBookings.find((row) => row.id === id);
+    if (booking) setCancelDraft({ kind: "classroom", booking });
+  }
 
-    const { error } = await supabase.from("classroom_bookings").delete().eq("id", id);
+  async function confirmSingleCancel() {
+    if (!cancelDraft) return;
+
+    const table = cancelDraft.kind === "practice" ? "bookings" : "classroom_bookings";
+    const { error } = await supabase.from(table).delete().eq("id", cancelDraft.booking.id);
 
     if (error) {
       alert(error.message);
       return;
     }
 
+    setCancelDraft(null);
     await loadData();
   }
 
   async function confirmSeriesCancel() {
-    if (!seriesCancelDraft) return;
+    if (!cancelDraft?.booking.recurring_series_id) return;
 
-    const table = seriesCancelDraft.kind === "practice" ? "bookings" : "classroom_bookings";
+    const table = cancelDraft.kind === "practice" ? "bookings" : "classroom_bookings";
     const { error } = await supabase
       .from(table)
       .delete()
-      .eq("recurring_series_id", seriesCancelDraft.seriesId);
+      .eq("recurring_series_id", cancelDraft.booking.recurring_series_id);
 
     if (error) {
       alert(error.message);
       return;
     }
 
-    setSeriesCancelDraft(null);
+    setCancelDraft(null);
     await loadData();
   }
 
@@ -432,28 +435,44 @@ export default function AdminBookingsPage() {
 
   return (
     <main className="min-h-screen bg-gray-100 p-8">
-      {seriesCancelDraft && (
+      {cancelDraft && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-2xl border shadow-2xl w-full max-w-lg p-6">
-            <h2 className="text-2xl font-bold">Cancel Recurring Series</h2>
-            <p className="text-gray-600 mt-2">{seriesCancelDraft.title}</p>
-            <p className="text-sm text-gray-500 mt-2">
-              This removes every future booking in this recurring series.
+            <h2 className="text-2xl font-bold">
+              {cancelDraft.booking.recurring_series_id ? "Cancel Recurring Booking" : "Cancel Booking"}
+            </h2>
+            <p className="text-gray-600 mt-2">
+              {cancelDraftLocation(cancelDraft)} · {cancelDraft.booking.booking_date} ·{" "}
+              {formatTime12(cancelDraft.booking.start_time)}-{formatTime12(cancelDraft.booking.end_time)}
             </p>
+            <p className="text-gray-500 text-sm mt-1">{bookingPerson(cancelDraft.booking)}</p>
+            {cancelDraft.booking.recurring_series_id && (
+              <p className="text-sm text-gray-500 mt-2">
+                Choose whether to cancel only this booking or all bookings in the recurring series.
+              </p>
+            )}
 
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex flex-wrap justify-end gap-3 mt-6">
               <button
-                onClick={() => setSeriesCancelDraft(null)}
+                onClick={() => setCancelDraft(null)}
                 className="border px-4 py-2 rounded-lg hover:bg-gray-100"
               >
-                Keep Series
+                Keep Booking
               </button>
               <button
-                onClick={confirmSeriesCancel}
-                className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+                onClick={confirmSingleCancel}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
               >
-                Cancel Entire Series
+                Cancel This Booking
               </button>
+              {cancelDraft.booking.recurring_series_id && (
+                <button
+                  onClick={confirmSeriesCancel}
+                  className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
+                >
+                  Cancel All Recurring Bookings
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -555,20 +574,6 @@ export default function AdminBookingsPage() {
                     >
                       Cancel
                     </button>
-                    {booking.recurring_series_id && (
-                      <button
-                        onClick={() =>
-                          setSeriesCancelDraft({
-                            kind: "practice",
-                            seriesId: booking.recurring_series_id!,
-                            title: `${roomName(booking.room_id)} · ${booking.booking_date} · ${bookingPerson(booking)}`,
-                          })
-                        }
-                        className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                      >
-                        Cancel Series
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}
@@ -604,20 +609,6 @@ export default function AdminBookingsPage() {
                     >
                       Cancel
                     </button>
-                    {booking.recurring_series_id && (
-                      <button
-                        onClick={() =>
-                          setSeriesCancelDraft({
-                            kind: "classroom",
-                            seriesId: booking.recurring_series_id!,
-                            title: `${classroomName(booking.classroom_id)} · ${booking.booking_date} · ${bookingPerson(booking)}`,
-                          })
-                        }
-                        className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-                      >
-                        Cancel Series
-                      </button>
-                    )}
                   </div>
                 </div>
               ))}
