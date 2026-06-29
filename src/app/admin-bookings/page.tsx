@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
-import KeyboardDatePicker from "@/components/KeyboardDatePicker";
 
 type Role = {
   email: string;
@@ -102,6 +101,17 @@ function getWeekRange(selectedDate: string) {
   const friday = addDays(monday, 4);
 
   return { start: monday, end: friday };
+}
+
+function formatShortDate(date: string) {
+  return new Date(date + "T00:00:00").toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function formatWeekLabel(week: { start: string; end: string }) {
+  return `${formatShortDate(week.start)} - ${formatShortDate(week.end)}`;
 }
 
 function cleanTime(time?: string | null) {
@@ -625,26 +635,25 @@ export default function AdminBookingsPage() {
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <h2 className="text-3xl font-bold mr-auto">Practice Room Bookings</h2>
 
-              <button
-                onClick={() => jumpPracticeWeek(-7)}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
-                Last Week
-              </button>
-              <KeyboardDatePicker
-                id="admin-practice-bookings-date"
-                label="Practice bookings week"
-                value={practiceFilterDate}
-                min={localToday()}
-                onChange={setPracticeFilterDate}
-                className="w-40"
-              />
-              <button
-                onClick={() => jumpPracticeWeek(7)}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
-                Next Week
-              </button>
+              <div className="flex items-center overflow-hidden rounded-lg border bg-white">
+                <button
+                  onClick={() => jumpPracticeWeek(-7)}
+                  aria-label="Previous week"
+                  className="h-10 w-10 border-r hover:bg-gray-100"
+                >
+                  &lt;
+                </button>
+                <span className="min-w-32 px-4 text-center text-sm font-semibold text-gray-700">
+                  {formatWeekLabel(practiceWeek)}
+                </span>
+                <button
+                  onClick={() => jumpPracticeWeek(7)}
+                  aria-label="Next week"
+                  className="h-10 w-10 border-l hover:bg-gray-100"
+                >
+                  &gt;
+                </button>
+              </div>
               <select
                 value={activePracticeRoomId()}
                 onChange={(event) => setPracticeFilterRoomId(event.target.value)}
@@ -695,26 +704,25 @@ export default function AdminBookingsPage() {
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <h2 className="text-3xl font-bold mr-auto">Classroom Bookings</h2>
 
-              <button
-                onClick={() => jumpClassroomWeek(-7)}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
-                Last Week
-              </button>
-              <KeyboardDatePicker
-                id="admin-classroom-bookings-date"
-                label="Classroom bookings week"
-                value={classroomFilterDate}
-                min={localToday()}
-                onChange={setClassroomFilterDate}
-                className="w-40"
-              />
-              <button
-                onClick={() => jumpClassroomWeek(7)}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
-              >
-                Next Week
-              </button>
+              <div className="flex items-center overflow-hidden rounded-lg border bg-white">
+                <button
+                  onClick={() => jumpClassroomWeek(-7)}
+                  aria-label="Previous week"
+                  className="h-10 w-10 border-r hover:bg-gray-100"
+                >
+                  &lt;
+                </button>
+                <span className="min-w-32 px-4 text-center text-sm font-semibold text-gray-700">
+                  {formatWeekLabel(classroomWeek)}
+                </span>
+                <button
+                  onClick={() => jumpClassroomWeek(7)}
+                  aria-label="Next week"
+                  className="h-10 w-10 border-l hover:bg-gray-100"
+                >
+                  &gt;
+                </button>
+              </div>
               <select
                 value={activeClassroomId()}
                 onChange={(event) => setClassroomFilterRoomId(event.target.value)}
