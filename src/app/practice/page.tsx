@@ -59,7 +59,6 @@ type BookingDraft = {
 } | null;
 
 const times = [
-  "09:00", "09:30",
   "10:00", "10:30",
   "11:00", "11:30",
   "12:00", "12:30",
@@ -244,8 +243,8 @@ export default function Home() {
   const [recurringStartDate, setRecurringStartDate] = useState(localToday());
   const [recurringEndDate, setRecurringEndDate] = useState(localToday());
   const [recurringWeekday, setRecurringWeekday] = useState("1");
-  const [recurringStartTime, setRecurringStartTime] = useState("09:00");
-  const [recurringEndTime, setRecurringEndTime] = useState("10:00");
+  const [recurringStartTime, setRecurringStartTime] = useState("10:00");
+  const [recurringEndTime, setRecurringEndTime] = useState("10:30");
   const [recurringRemark, setRecurringRemark] = useState("");
   const [recurringBookeeEmail, setRecurringBookeeEmail] = useState("");
   const [recurringBookeeName, setRecurringBookeeName] = useState("");
@@ -1287,7 +1286,7 @@ export default function Home() {
             </h1>
 
             <p className="text-gray-600 mt-2">
-              Rooms 515A–515L · Monday–Friday · 9AM–9PM
+              Rooms 515A–515L · Monday–Friday · 10AM–9PM
             </p>
 
             {selection && (
