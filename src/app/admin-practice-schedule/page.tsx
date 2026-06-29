@@ -778,12 +778,21 @@ export default function AdminPracticeSchedulePage() {
 
           {scheduleMode === "day" ? (
             <div className="overflow-x-auto border rounded-xl">
-              <table className="w-full border-collapse text-center text-sm">
+              <table
+                className="min-w-full table-fixed border-collapse text-center text-sm"
+                style={{ width: `${144 + times.length * 80}px` }}
+              >
+                <colgroup>
+                  <col style={{ width: 144 }} />
+                  {times.map((time) => (
+                    <col key={time} style={{ width: 80 }} />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr className="bg-gray-50">
-                    <th className="p-3 text-left border-b min-w-28">{formatScheduleDate(scheduleDate)}</th>
+                    <th className="p-3 text-left border-b">{formatScheduleDate(scheduleDate)}</th>
                     {times.map((time) => (
-                      <th key={time} className="p-2 border-b font-medium min-w-20">
+                      <th key={time} className="p-2 border-b font-medium">
                         {formatTime12(time)}
                       </th>
                     ))}
@@ -831,7 +840,11 @@ export default function AdminPracticeSchedulePage() {
                                 <button
                                   onClick={() => openEditBooking(booking)}
                                   title={label}
-                                  className="bg-gray-300 text-gray-700 border border-gray-400 text-xs min-h-12 px-2 py-1 flex items-center justify-center overflow-hidden w-full hover:bg-gray-400/60"
+                                  className="bg-gray-300 text-gray-700 border border-gray-400 text-xs h-12 px-2 py-1 flex items-center justify-center overflow-hidden w-full hover:bg-gray-400/60"
+                                  style={{
+                                    backgroundImage:
+                                      "repeating-linear-gradient(to right, transparent 0, transparent 79px, rgba(75, 85, 99, 0.35) 79px, rgba(75, 85, 99, 0.35) 80px)",
+                                  }}
                                 >
                                   <span className="line-clamp-2">{label}</span>
                                 </button>
