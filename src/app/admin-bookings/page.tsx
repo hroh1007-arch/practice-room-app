@@ -637,21 +637,23 @@ export default function AdminBookingsPage() {
 
               <div className="flex items-center overflow-hidden rounded-lg border bg-white">
                 <button
+                  type="button"
                   onClick={() => jumpPracticeWeek(-7)}
                   aria-label="Previous week"
-                  className="h-10 w-10 border-r hover:bg-gray-100"
+                  className="h-10 w-10 border-r text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
                 >
-                  &lt;
+                  ‹
                 </button>
                 <span className="min-w-32 px-4 text-center text-sm font-semibold text-gray-700">
                   {formatWeekLabel(practiceWeek)}
                 </span>
                 <button
+                  type="button"
                   onClick={() => jumpPracticeWeek(7)}
                   aria-label="Next week"
-                  className="h-10 w-10 border-l hover:bg-gray-100"
+                  className="h-10 w-10 border-l text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
                 >
-                  &gt;
+                  ›
                 </button>
               </div>
               <select
@@ -706,21 +708,23 @@ export default function AdminBookingsPage() {
 
               <div className="flex items-center overflow-hidden rounded-lg border bg-white">
                 <button
+                  type="button"
                   onClick={() => jumpClassroomWeek(-7)}
                   aria-label="Previous week"
-                  className="h-10 w-10 border-r hover:bg-gray-100"
+                  className="h-10 w-10 border-r text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
                 >
-                  &lt;
+                  ‹
                 </button>
                 <span className="min-w-32 px-4 text-center text-sm font-semibold text-gray-700">
                   {formatWeekLabel(classroomWeek)}
                 </span>
                 <button
+                  type="button"
                   onClick={() => jumpClassroomWeek(7)}
                   aria-label="Next week"
-                  className="h-10 w-10 border-l hover:bg-gray-100"
+                  className="h-10 w-10 border-l text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
                 >
-                  &gt;
+                  ›
                 </button>
               </div>
               <select
