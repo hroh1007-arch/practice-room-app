@@ -1400,13 +1400,22 @@ export default function Home() {
 
           {view === "booking" && (
             <div className="overflow-x-auto bg-white rounded-2xl shadow-lg border">
-              <table className="w-full border-collapse text-center">
+              <table
+                className="min-w-full table-fixed border-collapse text-center"
+                style={{ width: `${160 + times.length * 72}px` }}
+              >
+                <colgroup>
+                  <col style={{ width: 160 }} />
+                  {times.map((time) => (
+                    <col key={time} style={{ width: 72 }} />
+                  ))}
+                </colgroup>
                 <thead>
                   <tr className="bg-gray-50">
                     <th className="p-4 text-left border-b">Room</th>
 
                     {times.map((time) => (
-                      <th key={time} className="p-3 text-sm font-medium border-b">
+                      <th key={time} className="p-2 text-sm font-medium border-b">
                         {formatTime12(time)}
                       </th>
                     ))}
@@ -1468,8 +1477,14 @@ export default function Home() {
                                 <div
                                   title={[displayPerson(booking.user_name, booking.user_email), booking.remark].filter(Boolean).join(" · ")}
                                   className="bg-gray-300 text-gray-700 w-full h-8 border border-gray-300 text-xs overflow-hidden whitespace-nowrap px-2 flex items-center justify-center"
+                                  style={{
+                                    backgroundImage:
+                                      "repeating-linear-gradient(to right, transparent 0, transparent 71px, rgba(107, 114, 128, 0.35) 71px, rgba(107, 114, 128, 0.35) 72px)",
+                                  }}
                                 >
-                                  {[displayPerson(booking.user_name, booking.user_email), booking.remark].filter(Boolean).join(" · ")}
+                                  <span className="block min-w-0 truncate">
+                                    {[displayPerson(booking.user_name, booking.user_email), booking.remark].filter(Boolean).join(" · ")}
+                                  </span>
                                 </div>
                               </td>
                             );
