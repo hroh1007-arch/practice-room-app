@@ -177,6 +177,7 @@ export default function AdminClassroomSchedulePage() {
   const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
   const [scheduleDate, setScheduleDate] = useState(localToday());
   const [scheduleMode, setScheduleMode] = useState<"day" | "week">("week");
+  const [selectedClassroomId, setSelectedClassroomId] = useState("");
   const [editor, setEditor] = useState<BookingEditor | null>(null);
   const [deleteDraft, setDeleteDraft] = useState<BookingEditor | null>(null);
 
@@ -227,6 +228,13 @@ export default function AdminClassroomSchedulePage() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (classrooms.length === 0) return;
+    if (!classrooms.some((room) => room.id === selectedClassroomId)) {
+      setSelectedClassroomId(classrooms[0].id);
+    }
+  }, [classrooms, selectedClassroomId]);
 
   async function login() {
     await supabase.auth.signInWithOAuth({
@@ -291,11 +299,26 @@ export default function AdminClassroomSchedulePage() {
     );
   }
 
-  function bookingsForDate(date: string) {
-    return bookings.filter((booking) => booking.booking_date === date);
+  function activeClassroomId() {
+    return selectedClassroomId || classrooms[0]?.id || "";
   }
 
-  function openNewBooking(date = scheduleDate, roomId = classrooms[0]?.id || "", start = "09:00") {
+  function visibleClassrooms() {
+    const classroomId = activeClassroomId();
+    return classroomId ? classrooms.filter((room) => room.id === classroomId) : [];
+  }
+
+  function bookingsForDate(date: string) {
+    const classroomId = activeClassroomId();
+
+    return bookings.filter(
+      (booking) =>
+        booking.booking_date === date &&
+        booking.classroom_id === classroomId
+    );
+  }
+
+  function openNewBooking(date = scheduleDate, roomId = activeClassroomId(), start = "09:00") {
     setEditor({
       roomId,
       date,
@@ -766,6 +789,19 @@ export default function AdminClassroomSchedulePage() {
               onChange={setScheduleDate}
               className="w-40"
             />
+
+            <select
+              value={activeClassroomId()}
+              onChange={(event) => setSelectedClassroomId(event.target.value)}
+              aria-label="Classroom"
+              className="border rounded-lg px-4 py-2 min-w-40 bg-white"
+            >
+              {classrooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.room_number}
+                </option>
+              ))}
+            </select>
           </div>
 
           {scheduleMode === "day" ? (
@@ -792,7 +828,7 @@ export default function AdminClassroomSchedulePage() {
                 </thead>
 
                 <tbody>
-                  {classrooms.map((room) => (
+                  {visibleClassrooms().map((room) => (
                     <tr key={room.id}>
                       <td className="p-3 border-b bg-gray-50 text-left font-semibold">{room.room_number}</td>
 
@@ -897,7 +933,7 @@ export default function AdminClassroomSchedulePage() {
                     <button
                       type="button"
                       key={`${date}-${time}`}
-                      onClick={() => openNewBooking(date, classrooms[0]?.id || "", time)}
+                      onClick={() => openNewBooking(date, activeClassroomId(), time)}
                       aria-label={`Add classroom booking ${formatScheduleDate(date)} ${formatTime12(time)}`}
                       className={
                         date === localToday()
