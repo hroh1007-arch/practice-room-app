@@ -44,7 +44,6 @@ type BookingEditor = {
 };
 
 const times = [
-  "09:00", "09:30",
   "10:00", "10:30",
   "11:00", "11:30",
   "12:00", "12:30",
@@ -177,6 +176,7 @@ export default function AdminPracticeSchedulePage() {
   const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
   const [scheduleDate, setScheduleDate] = useState(localToday());
   const [scheduleMode, setScheduleMode] = useState<"day" | "week">("week");
+  const [selectedRoomId, setSelectedRoomId] = useState("");
   const [editor, setEditor] = useState<BookingEditor | null>(null);
   const [deleteDraft, setDeleteDraft] = useState<BookingEditor | null>(null);
 
@@ -232,6 +232,13 @@ export default function AdminPracticeSchedulePage() {
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (rooms.length === 0) return;
+    if (!rooms.some((room) => room.id === selectedRoomId)) {
+      setSelectedRoomId(rooms[0].id);
+    }
+  }, [rooms, selectedRoomId]);
 
   async function login() {
     await supabase.auth.signInWithOAuth({
@@ -296,11 +303,26 @@ export default function AdminPracticeSchedulePage() {
     );
   }
 
-  function bookingsForDate(date: string) {
-    return bookings.filter((booking) => booking.booking_date === date);
+  function activeRoomId() {
+    return selectedRoomId || rooms[0]?.id || "";
   }
 
-  function openNewBooking(date = scheduleDate, roomId = rooms[0]?.id || "", start = "09:00") {
+  function visibleRooms() {
+    const roomId = activeRoomId();
+    return roomId ? rooms.filter((room) => room.id === roomId) : [];
+  }
+
+  function bookingsForDate(date: string) {
+    const roomId = activeRoomId();
+
+    return bookings.filter(
+      (booking) =>
+        booking.booking_date === date &&
+        booking.room_id === roomId
+    );
+  }
+
+  function openNewBooking(date = scheduleDate, roomId = activeRoomId(), start = "10:00") {
     setEditor({
       roomId,
       date,
@@ -774,6 +796,19 @@ export default function AdminPracticeSchedulePage() {
               onChange={setScheduleDate}
               className="w-40"
             />
+
+            <select
+              value={activeRoomId()}
+              onChange={(event) => setSelectedRoomId(event.target.value)}
+              aria-label="Practice room"
+              className="border rounded-lg px-4 py-2 min-w-40 bg-white"
+            >
+              {rooms.map((room) => (
+                <option key={room.id} value={room.id}>
+                  {room.room_number}
+                </option>
+              ))}
+            </select>
           </div>
 
           {scheduleMode === "day" ? (
@@ -800,7 +835,7 @@ export default function AdminPracticeSchedulePage() {
                 </thead>
 
                 <tbody>
-                  {rooms.map((room) => (
+                  {visibleRooms().map((room) => (
                     <tr key={room.id}>
                       <td className="p-3 border-b bg-gray-50 text-left">
                         <div className="font-semibold">{room.room_number}</div>
@@ -911,7 +946,7 @@ export default function AdminPracticeSchedulePage() {
                     <button
                       type="button"
                       key={`${date}-${time}`}
-                      onClick={() => openNewBooking(date, rooms[0]?.id || "", time)}
+                      onClick={() => openNewBooking(date, activeRoomId(), time)}
                       aria-label={`Add practice booking ${formatScheduleDate(date)} ${formatTime12(time)}`}
                       className={
                         date === localToday()
