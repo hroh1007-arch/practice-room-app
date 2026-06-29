@@ -101,6 +101,14 @@ function localToday() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
 }
 
+function addDays(date: string, days: number) {
+  const next = new Date(date + "T00:00:00");
+  next.setDate(next.getDate() + days);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(
+    next.getDate()
+  ).padStart(2, "0")}`;
+}
+
 function cleanTime(time: string) {
   return time.slice(0, 5);
 }
@@ -647,6 +655,11 @@ export default function ClassroomsPage() {
     setDate(newDate);
   }
 
+  function jumpBookingWeek(days: number) {
+    const nextDate = addDays(date, days);
+    handleDateChange(nextDate < localToday() ? localToday() : nextDate);
+  }
+
   if (!user) {
     return (
       <main className="min-h-screen bg-gray-100 p-8 flex items-center justify-center">
@@ -1084,14 +1097,28 @@ export default function ClassroomsPage() {
               </button>
             )}
 
-            <KeyboardDatePicker
-              id="classroom-booking-date"
-              label="Classroom booking date"
-              value={date}
-              min={localToday()}
-              onChange={handleDateChange}
-              className="ml-auto w-40"
-            />
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => jumpBookingWeek(-7)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Last Week
+              </button>
+              <KeyboardDatePicker
+                id="classroom-booking-date"
+                label="Classroom booking date"
+                value={date}
+                min={localToday()}
+                onChange={handleDateChange}
+                className="w-40"
+              />
+              <button
+                onClick={() => jumpBookingWeek(7)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Next Week
+              </button>
+            </div>
           </div>
 
           {view === "booking" && (
