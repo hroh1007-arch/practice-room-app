@@ -1097,12 +1097,14 @@ export default function ClassroomsPage() {
               </button>
             )}
 
-            <div className="ml-auto flex items-center gap-2">
+            <div className="ml-auto flex items-center gap-1">
               <button
+                type="button"
                 onClick={() => jumpBookingWeek(-7)}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                aria-label="Previous week"
+                className="h-10 w-10 rounded-lg border bg-white text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
               >
-                Last Week
+                ‹
               </button>
               <KeyboardDatePicker
                 id="classroom-booking-date"
@@ -1113,10 +1115,12 @@ export default function ClassroomsPage() {
                 className="w-40"
               />
               <button
+                type="button"
                 onClick={() => jumpBookingWeek(7)}
-                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+                aria-label="Next week"
+                className="h-10 w-10 rounded-lg border bg-white text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
               >
-                Next Week
+                ›
               </button>
             </div>
           </div>
