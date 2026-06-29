@@ -337,6 +337,11 @@ export default function AdminPracticeSchedulePage() {
     });
   }
 
+  function jumpScheduleWeek(days: number) {
+    const nextDate = addDays(scheduleDate, days);
+    setScheduleDate(nextDate < localToday() ? localToday() : nextDate);
+  }
+
   function openEditBooking(booking: PracticeBooking) {
     setEditor({
       id: booking.id,
@@ -788,14 +793,28 @@ export default function AdminPracticeSchedulePage() {
               </button>
             </div>
 
-            <KeyboardDatePicker
-              id="practice-schedule-date"
-              label="Practice room schedule date"
-              value={scheduleDate}
-              min={localToday()}
-              onChange={setScheduleDate}
-              className="w-40"
-            />
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => jumpScheduleWeek(-7)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Last Week
+              </button>
+              <KeyboardDatePicker
+                id="practice-schedule-date"
+                label="Practice room schedule date"
+                value={scheduleDate}
+                min={localToday()}
+                onChange={setScheduleDate}
+                className="w-40"
+              />
+              <button
+                onClick={() => jumpScheduleWeek(7)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Next Week
+              </button>
+            </div>
 
             <select
               value={activeRoomId()}
