@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import KeyboardDatePicker from "@/components/KeyboardDatePicker";
 
 type Role = {
   email: string;
@@ -85,6 +86,24 @@ function localToday() {
   ).padStart(2, "0")}`;
 }
 
+function addDays(date: string, days: number) {
+  const next = new Date(date + "T00:00:00");
+  next.setDate(next.getDate() + days);
+  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(
+    next.getDate()
+  ).padStart(2, "0")}`;
+}
+
+function getWeekRange(selectedDate: string) {
+  const dateObj = new Date(selectedDate + "T00:00:00");
+  const day = dateObj.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const monday = addDays(selectedDate, diffToMonday);
+  const friday = addDays(monday, 4);
+
+  return { start: monday, end: friday };
+}
+
 function cleanTime(time?: string | null) {
   return (time || "").slice(0, 5);
 }
@@ -130,6 +149,10 @@ export default function AdminBookingsPage() {
   const [equipmentCheckouts, setEquipmentCheckouts] = useState<EquipmentCheckout[]>([]);
   const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
   const [cancelDraft, setCancelDraft] = useState<AdminCancelDraft | null>(null);
+  const [practiceFilterDate, setPracticeFilterDate] = useState(localToday());
+  const [practiceFilterRoomId, setPracticeFilterRoomId] = useState("");
+  const [classroomFilterDate, setClassroomFilterDate] = useState(localToday());
+  const [classroomFilterRoomId, setClassroomFilterRoomId] = useState("");
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -149,7 +172,13 @@ export default function AdminBookingsPage() {
       .from("practice_rooms")
       .select("id, room_number");
 
-    setRooms(roomData || []);
+    setRooms(
+      (roomData || []).filter(
+        (room) =>
+          room.room_number !== "515I" &&
+          !["435", "519", "522", "524", "526"].includes(room.room_number)
+      )
+    );
 
     const { data: classroomData } = await supabase
       .from("classrooms")
@@ -202,6 +231,20 @@ export default function AdminBookingsPage() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    if (rooms.length === 0) return;
+    if (!rooms.some((room) => room.id === practiceFilterRoomId)) {
+      setPracticeFilterRoomId(rooms[0].id);
+    }
+  }, [rooms, practiceFilterRoomId]);
+
+  useEffect(() => {
+    if (classrooms.length === 0) return;
+    if (!classrooms.some((room) => room.id === classroomFilterRoomId)) {
+      setClassroomFilterRoomId(classrooms[0].id);
+    }
+  }, [classrooms, classroomFilterRoomId]);
+
   async function login() {
     await supabase.auth.signInWithOAuth({
       provider: "google",
@@ -231,6 +274,39 @@ export default function AdminBookingsPage() {
       ? roomName(draft.booking.room_id)
       : classroomName(draft.booking.classroom_id);
   }
+
+  function activePracticeRoomId() {
+    return practiceFilterRoomId || rooms[0]?.id || "";
+  }
+
+  function activeClassroomId() {
+    return classroomFilterRoomId || classrooms[0]?.id || "";
+  }
+
+  function jumpPracticeWeek(days: number) {
+    const nextDate = addDays(practiceFilterDate, days);
+    setPracticeFilterDate(nextDate < localToday() ? localToday() : nextDate);
+  }
+
+  function jumpClassroomWeek(days: number) {
+    const nextDate = addDays(classroomFilterDate, days);
+    setClassroomFilterDate(nextDate < localToday() ? localToday() : nextDate);
+  }
+
+  const practiceWeek = getWeekRange(practiceFilterDate);
+  const classroomWeek = getWeekRange(classroomFilterDate);
+  const filteredPracticeBookings = practiceBookings.filter(
+    (booking) =>
+      booking.room_id === activePracticeRoomId() &&
+      booking.booking_date >= practiceWeek.start &&
+      booking.booking_date <= practiceWeek.end
+  );
+  const filteredClassroomBookings = classroomBookings.filter(
+    (booking) =>
+      booking.classroom_id === activeClassroomId() &&
+      booking.booking_date >= classroomWeek.start &&
+      booking.booking_date <= classroomWeek.end
+  );
 
   async function loadAuthUserNames(bookings: Array<PracticeBooking | ClassroomBooking>) {
     const emails = Array.from(
@@ -546,14 +622,49 @@ export default function AdminBookingsPage() {
 
         <div className="space-y-8">
           <section className="bg-white rounded-2xl shadow-lg border p-6">
-            <h2 className="text-3xl font-bold mb-4">Practice Room Bookings</h2>
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <h2 className="text-3xl font-bold mr-auto">Practice Room Bookings</h2>
 
-            {practiceBookings.length === 0 && (
-              <p className="text-gray-600">No future practice room bookings.</p>
+              <button
+                onClick={() => jumpPracticeWeek(-7)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Last Week
+              </button>
+              <KeyboardDatePicker
+                id="admin-practice-bookings-date"
+                label="Practice bookings week"
+                value={practiceFilterDate}
+                min={localToday()}
+                onChange={setPracticeFilterDate}
+                className="w-40"
+              />
+              <button
+                onClick={() => jumpPracticeWeek(7)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Next Week
+              </button>
+              <select
+                value={activePracticeRoomId()}
+                onChange={(event) => setPracticeFilterRoomId(event.target.value)}
+                aria-label="Practice room"
+                className="border rounded-lg px-4 py-2 min-w-36 bg-white"
+              >
+                {rooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.room_number}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {filteredPracticeBookings.length === 0 && (
+              <p className="text-gray-600">No practice room bookings for this room and week.</p>
             )}
 
             <div className="space-y-4">
-              {practiceBookings.map((booking) => (
+              {filteredPracticeBookings.map((booking) => (
                 <div key={booking.id} className="border rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-lg">{roomName(booking.room_id)}</p>
@@ -581,14 +692,49 @@ export default function AdminBookingsPage() {
           </section>
 
           <section className="bg-white rounded-2xl shadow-lg border p-6">
-            <h2 className="text-3xl font-bold mb-4">Classroom Bookings</h2>
+            <div className="flex flex-wrap items-center gap-3 mb-4">
+              <h2 className="text-3xl font-bold mr-auto">Classroom Bookings</h2>
 
-            {classroomBookings.length === 0 && (
-              <p className="text-gray-600">No future classroom bookings.</p>
+              <button
+                onClick={() => jumpClassroomWeek(-7)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Last Week
+              </button>
+              <KeyboardDatePicker
+                id="admin-classroom-bookings-date"
+                label="Classroom bookings week"
+                value={classroomFilterDate}
+                min={localToday()}
+                onChange={setClassroomFilterDate}
+                className="w-40"
+              />
+              <button
+                onClick={() => jumpClassroomWeek(7)}
+                className="border px-4 py-2 rounded-lg hover:bg-gray-100"
+              >
+                Next Week
+              </button>
+              <select
+                value={activeClassroomId()}
+                onChange={(event) => setClassroomFilterRoomId(event.target.value)}
+                aria-label="Classroom"
+                className="border rounded-lg px-4 py-2 min-w-36 bg-white"
+              >
+                {classrooms.map((room) => (
+                  <option key={room.id} value={room.id}>
+                    {room.room_number}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {filteredClassroomBookings.length === 0 && (
+              <p className="text-gray-600">No classroom bookings for this classroom and week.</p>
             )}
 
             <div className="space-y-4">
-              {classroomBookings.map((booking) => (
+              {filteredClassroomBookings.map((booking) => (
                 <div key={booking.id} className="border rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <p className="font-semibold text-lg">{classroomName(booking.classroom_id)}</p>
