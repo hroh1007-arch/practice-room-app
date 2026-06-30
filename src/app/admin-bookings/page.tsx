@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import KeyboardDatePicker from "@/components/KeyboardDatePicker";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 
@@ -78,6 +79,9 @@ const backupAdminEmails = [
   "ma3412@tc.columbia.edu",
 ];
 
+const ALL_PRACTICE_ROOMS = "all-practice-rooms";
+const ALL_CLASSROOMS = "all-classrooms";
+
 function localToday() {
   const now = new Date();
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
@@ -85,33 +89,12 @@ function localToday() {
   ).padStart(2, "0")}`;
 }
 
-function addDays(date: string, days: number) {
-  const next = new Date(date + "T00:00:00");
-  next.setDate(next.getDate() + days);
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(
-    next.getDate()
-  ).padStart(2, "0")}`;
+function compareRoomNumbers(a: string, b: string) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function getWeekRange(selectedDate: string) {
-  const dateObj = new Date(selectedDate + "T00:00:00");
-  const day = dateObj.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = addDays(selectedDate, diffToMonday);
-  const friday = addDays(monday, 4);
-
-  return { start: monday, end: friday };
-}
-
-function formatShortDate(date: string) {
-  return new Date(date + "T00:00:00").toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function formatWeekLabel(week: { start: string; end: string }) {
-  return `${formatShortDate(week.start)} - ${formatShortDate(week.end)}`;
+function sortRooms(rooms: Room[]) {
+  return [...rooms].sort((a, b) => compareRoomNumbers(a.room_number, b.room_number));
 }
 
 function cleanTime(time?: string | null) {
@@ -160,9 +143,9 @@ export default function AdminBookingsPage() {
   const [authUserNames, setAuthUserNames] = useState<Record<string, string>>({});
   const [cancelDraft, setCancelDraft] = useState<AdminCancelDraft | null>(null);
   const [practiceFilterDate, setPracticeFilterDate] = useState(localToday());
-  const [practiceFilterRoomId, setPracticeFilterRoomId] = useState("");
+  const [practiceFilterRoomId, setPracticeFilterRoomId] = useState(ALL_PRACTICE_ROOMS);
   const [classroomFilterDate, setClassroomFilterDate] = useState(localToday());
-  const [classroomFilterRoomId, setClassroomFilterRoomId] = useState("");
+  const [classroomFilterRoomId, setClassroomFilterRoomId] = useState(ALL_CLASSROOMS);
 
   const currentRole = user?.email
     ? roles.find((r) => r.email.toLowerCase() === user.email?.toLowerCase())?.role
@@ -183,10 +166,12 @@ export default function AdminBookingsPage() {
       .select("id, room_number");
 
     setRooms(
-      (roomData || []).filter(
-        (room) =>
-          room.room_number !== "515I" &&
-          !["435", "519", "522", "524", "526"].includes(room.room_number)
+      sortRooms(
+        (roomData || []).filter(
+          (room) =>
+            room.room_number !== "515I" &&
+            !["435", "519", "522", "524", "526"].includes(room.room_number)
+        )
       )
     );
 
@@ -195,7 +180,7 @@ export default function AdminBookingsPage() {
       .select("id, room_number")
       .order("room_number");
 
-    setClassrooms(classroomData || []);
+    setClassrooms(sortRooms(classroomData || []));
 
     if (!activeUser?.email) return;
 
@@ -243,15 +228,21 @@ export default function AdminBookingsPage() {
 
   useEffect(() => {
     if (rooms.length === 0) return;
-    if (!rooms.some((room) => room.id === practiceFilterRoomId)) {
-      setPracticeFilterRoomId(rooms[0].id);
+    if (
+      practiceFilterRoomId !== ALL_PRACTICE_ROOMS &&
+      !rooms.some((room) => room.id === practiceFilterRoomId)
+    ) {
+      setPracticeFilterRoomId(ALL_PRACTICE_ROOMS);
     }
   }, [rooms, practiceFilterRoomId]);
 
   useEffect(() => {
     if (classrooms.length === 0) return;
-    if (!classrooms.some((room) => room.id === classroomFilterRoomId)) {
-      setClassroomFilterRoomId(classrooms[0].id);
+    if (
+      classroomFilterRoomId !== ALL_CLASSROOMS &&
+      !classrooms.some((room) => room.id === classroomFilterRoomId)
+    ) {
+      setClassroomFilterRoomId(ALL_CLASSROOMS);
     }
   }, [classrooms, classroomFilterRoomId]);
 
@@ -285,37 +276,23 @@ export default function AdminBookingsPage() {
       : classroomName(draft.booking.classroom_id);
   }
 
-  function activePracticeRoomId() {
-    return practiceFilterRoomId || rooms[0]?.id || "";
-  }
-
-  function activeClassroomId() {
-    return classroomFilterRoomId || classrooms[0]?.id || "";
-  }
-
-  function jumpPracticeWeek(days: number) {
-    const nextDate = addDays(practiceFilterDate, days);
-    setPracticeFilterDate(nextDate < localToday() ? localToday() : nextDate);
-  }
-
-  function jumpClassroomWeek(days: number) {
-    const nextDate = addDays(classroomFilterDate, days);
-    setClassroomFilterDate(nextDate < localToday() ? localToday() : nextDate);
-  }
-
-  const practiceWeek = getWeekRange(practiceFilterDate);
-  const classroomWeek = getWeekRange(classroomFilterDate);
   const filteredPracticeBookings = practiceBookings.filter(
     (booking) =>
-      booking.room_id === activePracticeRoomId() &&
-      booking.booking_date >= practiceWeek.start &&
-      booking.booking_date <= practiceWeek.end
+      booking.booking_date === practiceFilterDate &&
+      (practiceFilterRoomId === ALL_PRACTICE_ROOMS || booking.room_id === practiceFilterRoomId)
+  ).sort(
+    (a, b) =>
+      compareRoomNumbers(roomName(a.room_id), roomName(b.room_id)) ||
+      cleanTime(a.start_time).localeCompare(cleanTime(b.start_time))
   );
   const filteredClassroomBookings = classroomBookings.filter(
     (booking) =>
-      booking.classroom_id === activeClassroomId() &&
-      booking.booking_date >= classroomWeek.start &&
-      booking.booking_date <= classroomWeek.end
+      booking.booking_date === classroomFilterDate &&
+      (classroomFilterRoomId === ALL_CLASSROOMS || booking.classroom_id === classroomFilterRoomId)
+  ).sort(
+    (a, b) =>
+      compareRoomNumbers(classroomName(a.classroom_id), classroomName(b.classroom_id)) ||
+      cleanTime(a.start_time).localeCompare(cleanTime(b.start_time))
   );
 
   async function loadAuthUserNames(bookings: Array<PracticeBooking | ClassroomBooking>) {
@@ -635,33 +612,21 @@ export default function AdminBookingsPage() {
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <h2 className="text-3xl font-bold mr-auto">Practice Room Bookings</h2>
 
-              <div className="flex items-center overflow-hidden rounded-lg border bg-white">
-                <button
-                  type="button"
-                  onClick={() => jumpPracticeWeek(-7)}
-                  aria-label="Previous week"
-                  className="h-10 w-10 border-r text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  ‹
-                </button>
-                <span className="min-w-32 px-4 text-center text-sm font-semibold text-gray-700">
-                  {formatWeekLabel(practiceWeek)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => jumpPracticeWeek(7)}
-                  aria-label="Next week"
-                  className="h-10 w-10 border-l text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  ›
-                </button>
-              </div>
+              <KeyboardDatePicker
+                id="admin-practice-bookings-date"
+                label="Practice room bookings date"
+                value={practiceFilterDate}
+                min={localToday()}
+                onChange={setPracticeFilterDate}
+                className="w-44"
+              />
               <select
-                value={activePracticeRoomId()}
+                value={practiceFilterRoomId}
                 onChange={(event) => setPracticeFilterRoomId(event.target.value)}
                 aria-label="Practice room"
                 className="border rounded-lg px-4 py-2 min-w-36 bg-white"
               >
+                <option value={ALL_PRACTICE_ROOMS}>All rooms</option>
                 {rooms.map((room) => (
                   <option key={room.id} value={room.id}>
                     {room.room_number}
@@ -671,7 +636,7 @@ export default function AdminBookingsPage() {
             </div>
 
             {filteredPracticeBookings.length === 0 && (
-              <p className="text-gray-600">No practice room bookings for this room and week.</p>
+              <p className="text-gray-600">No practice room bookings for this day.</p>
             )}
 
             <div className="space-y-4">
@@ -706,33 +671,21 @@ export default function AdminBookingsPage() {
             <div className="flex flex-wrap items-center gap-3 mb-4">
               <h2 className="text-3xl font-bold mr-auto">Classroom Bookings</h2>
 
-              <div className="flex items-center overflow-hidden rounded-lg border bg-white">
-                <button
-                  type="button"
-                  onClick={() => jumpClassroomWeek(-7)}
-                  aria-label="Previous week"
-                  className="h-10 w-10 border-r text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  ‹
-                </button>
-                <span className="min-w-32 px-4 text-center text-sm font-semibold text-gray-700">
-                  {formatWeekLabel(classroomWeek)}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => jumpClassroomWeek(7)}
-                  aria-label="Next week"
-                  className="h-10 w-10 border-l text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  ›
-                </button>
-              </div>
+              <KeyboardDatePicker
+                id="admin-classroom-bookings-date"
+                label="Classroom bookings date"
+                value={classroomFilterDate}
+                min={localToday()}
+                onChange={setClassroomFilterDate}
+                className="w-44"
+              />
               <select
-                value={activeClassroomId()}
+                value={classroomFilterRoomId}
                 onChange={(event) => setClassroomFilterRoomId(event.target.value)}
                 aria-label="Classroom"
                 className="border rounded-lg px-4 py-2 min-w-36 bg-white"
               >
+                <option value={ALL_CLASSROOMS}>All classrooms</option>
                 {classrooms.map((room) => (
                   <option key={room.id} value={room.id}>
                     {room.room_number}
@@ -742,7 +695,7 @@ export default function AdminBookingsPage() {
             </div>
 
             {filteredClassroomBookings.length === 0 && (
-              <p className="text-gray-600">No classroom bookings for this classroom and week.</p>
+              <p className="text-gray-600">No classroom bookings for this day.</p>
             )}
 
             <div className="space-y-4">
