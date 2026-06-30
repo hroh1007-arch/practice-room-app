@@ -106,14 +106,6 @@ function localToday() {
   ).padStart(2, "0")}`;
 }
 
-function addDays(date: string, days: number) {
-  const next = new Date(date + "T00:00:00");
-  next.setDate(next.getDate() + days);
-  return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}-${String(
-    next.getDate()
-  ).padStart(2, "0")}`;
-}
-
 function cleanTime(time: string) {
   return time.slice(0, 5);
 }
@@ -1022,11 +1014,6 @@ export default function Home() {
     setDate(newDate);
   }
 
-  function jumpBookingWeek(days: number) {
-    const nextDate = addDays(date, days);
-    handleDateChange(nextDate < localToday() ? localToday() : nextDate);
-  }
-
   return (
     <>
       {bookingDraft && (
@@ -1399,15 +1386,7 @@ export default function Home() {
             )}
 
             {view === "booking" && (
-              <div className="ml-auto flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => jumpBookingWeek(-7)}
-                  aria-label="Previous week"
-                  className="h-10 w-10 rounded-lg border bg-white text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  ‹
-                </button>
+              <div className="ml-auto">
                 <KeyboardDatePicker
                   id="practice-booking-date"
                   label="Practice room booking date"
@@ -1416,14 +1395,6 @@ export default function Home() {
                   onChange={handleDateChange}
                   className="w-40"
                 />
-                <button
-                  type="button"
-                  onClick={() => jumpBookingWeek(7)}
-                  aria-label="Next week"
-                  className="h-10 w-10 rounded-lg border bg-white text-xl leading-none text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-900"
-                >
-                  ›
-                </button>
               </div>
             )}
           </div>
